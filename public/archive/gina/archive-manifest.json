@@ -283,10 +283,6 @@
   ],
   "assetFailures": [
     {
-      "url": "https://ginafortexas.com/wp-content/uploads/2026/10/image-1024x576-1.jpeg",
-      "error": "Error: HTTP 404"
-    },
-    {
       "url": "https://ginafortexas.com/wp-content/uploads/2026/10/image-1024x576-2.jpeg",
       "error": "Error: HTTP 404"
     },
@@ -296,6 +292,10 @@
     },
     {
       "url": "https://ginafortexas.com/wp-content/uploads/2026/10/image-2-1024x576.jpeg",
+      "error": "Error: HTTP 404"
+    },
+    {
+      "url": "https://ginafortexas.com/wp-content/uploads/2026/10/image-1024x576-1.jpeg",
       "error": "Error: HTTP 404"
     }
   ]

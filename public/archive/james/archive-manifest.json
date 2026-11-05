@@ -27,15 +27,7 @@
   "crawlErrors": [],
   "assetFailures": [
     {
-      "url": "https://www.tiktok.com/embed/v2/7679599337889942815?lang=en-US&referrer=https%3A%2F%2Fjamestalarico.com%2Fissue%2Fhealth-care%2F&embedFrom=oembed&ab_version=v0",
-      "error": "Error: HTTP 429"
-    },
-    {
       "url": "https://www.tiktok.com/embed/v2/7678801788518157599?lang=en-US&referrer=https%3A%2F%2Fjamestalarico.com%2Fissue%2Fsocial-media-artificial-intelligence-tech%2F&embedFrom=oembed&ab_version=v0",
-      "error": "Error: HTTP 429"
-    },
-    {
-      "url": "https://www.tiktok.com/embed/v2/7665754035261148447?lang=en-US&referrer=https%3A%2F%2Fjamestalarico.com%2Fissue%2Fsocial-media-artificial-intelligence-tech%2F&embedFrom=oembed&ab_version=v0",
       "error": "Error: HTTP 429"
     }
   ]
