@@ -1,0 +1,42 @@
+{
+  "captured": "2026-11-05",
+  "origin": "https://jamestalarico.com",
+  "pages": [
+    "https://jamestalarico.com/",
+    "https://jamestalarico.com/issues/",
+    "https://jamestalarico.com/issue/corruption-democracy/",
+    "https://jamestalarico.com/issue/energy-environment/",
+    "https://jamestalarico.com/issue/foreign-policy/",
+    "https://jamestalarico.com/issue/freedom-family-faith/",
+    "https://jamestalarico.com/issue/health-care/",
+    "https://jamestalarico.com/issue/immigration-border-security/",
+    "https://jamestalarico.com/issue/labor-business/",
+    "https://jamestalarico.com/issue/public-education/",
+    "https://jamestalarico.com/issue/public-safety-justice/",
+    "https://jamestalarico.com/issue/rural-investment/",
+    "https://jamestalarico.com/issue/social-media-artificial-intelligence-tech/",
+    "https://jamestalarico.com/issue/taxes-cost-of-living/",
+    "https://jamestalarico.com/issue/veterans/",
+    "https://jamestalarico.com/meet-james-talarico/",
+    "https://jamestalarico.com/why-im-running/",
+    "https://jamestalarico.com/vote/",
+    "https://jamestalarico.com/tos/",
+    "https://jamestalarico.com/what-voters-need-to-know-about-james/",
+    "https://jamestalarico.com/privacy-policy-terms-of-service/"
+  ],
+  "crawlErrors": [],
+  "assetFailures": [
+    {
+      "url": "https://www.tiktok.com/embed/v2/7679599337889942815?lang=en-US&referrer=https%3A%2F%2Fjamestalarico.com%2Fissue%2Fhealth-care%2F&embedFrom=oembed&ab_version=v0",
+      "error": "Error: HTTP 429"
+    },
+    {
+      "url": "https://www.tiktok.com/embed/v2/7678801788518157599?lang=en-US&referrer=https%3A%2F%2Fjamestalarico.com%2Fissue%2Fsocial-media-artificial-intelligence-tech%2F&embedFrom=oembed&ab_version=v0",
+      "error": "Error: HTTP 429"
+    },
+    {
+      "url": "https://www.tiktok.com/embed/v2/7665754035261148447?lang=en-US&referrer=https%3A%2F%2Fjamestalarico.com%2Fissue%2Fsocial-media-artificial-intelligence-tech%2F&embedFrom=oembed&ab_version=v0",
+      "error": "Error: HTTP 429"
+    }
+  ]
+}

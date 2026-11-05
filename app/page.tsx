@@ -233,6 +233,7 @@ function SamplePledges({
     summary_text: string;
     topic: string | null;
     source_url: string;
+    archive_url: string | null;
     status: string;
     confidence: string | null;
     notes: string | null;

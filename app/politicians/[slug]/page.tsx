@@ -83,8 +83,8 @@ export default async function PoliticianPage({ params }: Props) {
         <ul className="flex flex-wrap gap-3 text-sm">
           {politician.campaign_site_url ? (
             <li>
-              <a className="font-semibold text-bluebonnet underline" href={politician.campaign_site_url}>
-                Campaign website (theirs)
+              <a className="font-semibold text-bluebonnet underline" href={politician.archive_url ?? politician.campaign_site_url}>
+                Campaign website (archive)
               </a>
             </li>
           ) : null}

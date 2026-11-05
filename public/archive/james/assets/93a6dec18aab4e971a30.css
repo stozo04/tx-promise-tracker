@@ -1,0 +1,52 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * commuters-sans:
+ *   - http://typekit.com/eulas/00000000000000007735c45c
+ * mundial:
+ *   - http://typekit.com/eulas/00000000000000007735ee06
+ *   - http://typekit.com/eulas/00000000000000007735ee08
+ *   - http://typekit.com/eulas/00000000000000007735ee0d
+ *   - http://typekit.com/eulas/00000000000000007735ee0e
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2025-09-07 19:38:49 UTC"}*/
+
+@import url("/archive/james/assets/0285b0e0961057cdee01.css");
+
+@font-face {
+font-family:"commuters-sans";
+src:url("/archive/james/assets/b079861c2fb1497560d7.bin") format("woff2"),url("/archive/james/assets/6b477771cb6dce6525ab.bin") format("woff"),url("/archive/james/assets/91f49d02eac811c3e79f.bin") format("opentype");
+font-display:auto;font-style:normal;font-weight:600;font-stretch:normal;
+}
+
+@font-face {
+font-family:"mundial";
+src:url("/archive/james/assets/2eed17685c44d667d788.bin") format("woff2"),url("/archive/james/assets/67446a9b2da6a10d8ece.bin") format("woff"),url("/archive/james/assets/81aed7c069dae0b16346.bin") format("opentype");
+font-display:auto;font-style:italic;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"mundial";
+src:url("/archive/james/assets/29f8c6f1b2a226bbdc8d.bin") format("woff2"),url("/archive/james/assets/f9930eb11a658d56e599.bin") format("woff"),url("/archive/james/assets/17cc1da400326806960e.bin") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"mundial";
+src:url("/archive/james/assets/b94751d3360c65d67170.bin") format("woff2"),url("/archive/james/assets/640b3554e7da67b5a60b.bin") format("woff"),url("/archive/james/assets/d8af747cc5ed9900b6f7.bin") format("opentype");
+font-display:auto;font-style:italic;font-weight:700;font-stretch:normal;
+}
+
+@font-face {
+font-family:"mundial";
+src:url("/archive/james/assets/e46167cba4a7ba2f8b9a.bin") format("woff2"),url("/archive/james/assets/ad01f2aa93db8925c307.bin") format("woff"),url("/archive/james/assets/633fcd9933a6c7572c5e.bin") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+.tk-commuters-sans { font-family: "commuters-sans",sans-serif; }
+.tk-mundial { font-family: "mundial",sans-serif; }

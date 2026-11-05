@@ -119,8 +119,8 @@ export default async function PromisePage({ params }: Props) {
       <section className="space-y-2">
         <h2 className="text-2xl text-ink">Primary source</h2>
         <p>
-          <a className="font-semibold text-bluebonnet underline" href={promise.source_url}>
-            Read it at {hostname(promise.source_url)}
+          <a className="font-semibold text-bluebonnet underline" href={promise.archive_url ?? promise.source_url}>
+            Read the archived source{!promise.archive_url ? ` at ${hostname(promise.source_url)}` : ""}
           </a>
         </p>
         {source?.title ? <p className="text-sm text-muted-foreground">{source.title}</p> : null}

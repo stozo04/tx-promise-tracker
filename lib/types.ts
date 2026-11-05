@@ -25,6 +25,7 @@ export type Politician = {
   x_user_id: string | null;
   youtube_url: string | null;
   campaign_site_url: string | null;
+  archive_url: string | null;
   official_site_url: string | null;
   status: string;
   created_at: string;
@@ -39,6 +40,7 @@ export type PromiseRow = {
   date_said: string | null;
   source_id: string | null;
   source_url: string;
+  archive_url: string | null;
   verbatim_quote: string;
   status: string;
   confidence: string | null;
@@ -53,6 +55,7 @@ export type SourceRow = {
   politician_id: string;
   source_type: string;
   url: string;
+  archive_url: string | null;
   title: string | null;
   published_at: string | null;
   captured_at: string;
