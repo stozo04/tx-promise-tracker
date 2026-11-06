@@ -27,7 +27,7 @@ export function ShowMore({ total, children }: { total: number; children: ReactNo
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="mt-3 inline-flex min-h-11 items-center self-start rounded-xl border-2 border-border px-4 text-sm font-bold hover:bg-secondary"
+        className="mt-3 inline-flex min-h-11 items-center self-end rounded-xl border-2 border-border px-4 text-sm font-bold hover:bg-secondary"
       >
         {open ? "Show fewer" : `Show all ${total} pledges`}
       </button>
