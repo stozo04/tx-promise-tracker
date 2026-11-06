@@ -7,6 +7,31 @@ import { cn } from "@/lib/utils";
 
 export type DropdownOption = { value: string; label: string };
 
+const SMALL_WORDS = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "in", "of", "on", "or", "the", "to", "vs"]);
+
+/** "corruption and democracy" -> "Corruption and Democracy". Keeps acronyms like "AI" as written. */
+export function titleCase(text: string) {
+  return text
+    .split(" ")
+    .map((word, index) => {
+      if (!word) return word;
+      const lower = word.toLowerCase();
+      if (index > 0 && SMALL_WORDS.has(lower)) return lower;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
+}
+
+/** "All …" stays first; everything else A to Z (numbers in numeric order). */
+function arrange(options: DropdownOption[]) {
+  const shaped = options.map((option) => ({ ...option, label: titleCase(option.label) }));
+  const pinned = shaped.filter((option) => option.value === "all");
+  const rest = shaped
+    .filter((option) => option.value !== "all")
+    .sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true, sensitivity: "base" }));
+  return [...pinned, ...rest];
+}
+
 /**
  * The site's dropdown: a styled, keyboard-accessible listbox (Base UI Select)
  * instead of the browser's built-in menu, so it looks the same everywhere,
@@ -33,13 +58,14 @@ export function Dropdown({
   inline?: boolean;
 }) {
   const labelId = `${id}-label`;
+  const items = arrange(options);
   return (
     <div className={cn(inline ? "flex items-center gap-2.5" : "flex flex-col gap-1", className)}>
       <span id={labelId} className={cn("text-sm font-bold", labelClassName)}>
         {label}
       </span>
       <Select.Root
-        items={options}
+        items={items}
         value={value}
         onValueChange={(next) => {
           if (typeof next === "string") onChange(next);
@@ -62,7 +88,7 @@ export function Dropdown({
           <Select.Positioner sideOffset={6} align="start" alignItemWithTrigger={false} className="z-50 outline-none">
             <Select.Popup className="max-h-[min(22rem,var(--available-height))] min-w-(--anchor-width) origin-(--transform-origin) overflow-y-auto rounded-2xl border border-border bg-card p-1.5 text-foreground shadow-xl outline-none transition-[opacity,transform] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
               <Select.List>
-                {options.map((option) => (
+                {items.map((option) => (
                   <Select.Item
                     key={option.value}
                     value={option.value}
