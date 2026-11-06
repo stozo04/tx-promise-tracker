@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Saved copies of campaign pages, including their third-party scripts. Not our code.
+    "public/archive/**",
+    // Supabase Edge Functions run on Deno and are checked by Deno, not by Next.
+    "supabase/functions/**",
   ]),
 ]);
 

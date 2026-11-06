@@ -1,0 +1,11 @@
+# Only the settings this repo depends on. Both public functions do their own
+# checks (one sync per day, one vote per connection), so the gateway must not
+# require a signed-in user. Without this, `supabase functions deploy` turns
+# JWT checks back on and the site's Sync button and votes get 401s.
+project_id = "tx-promise-tracker"
+
+[functions.tx_sync]
+verify_jwt = false
+
+[functions.tx_community_vote]
+verify_jwt = false

@@ -7,7 +7,7 @@ import { GITHUB_REPO_URL, INDEPENDENT_DISCLAIMER } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Roadmap",
-  description: "What the tracker shows today, and the voting record and donations work that has not started.",
+  description: "What the tracker shows today, what Sync loads automatically, and what is still added by hand.",
 };
 
 export default function RoadmapPage() {
@@ -45,13 +45,12 @@ export default function RoadmapPage() {
           promise only when the vote actually bears on that promise.
         </p>
         <ul className="list-disc space-y-2 pl-5 leading-7">
-          <li>James Talarico, U.S. Senate: Congress.gov and Senate roll calls.</li>
-          <li>Gina Hinojosa, Governor of Texas: Texas bill signings and vetoes.</li>
+          <li>James Talarico, U.S. Senate: Congress.gov and Senate roll calls. Loaded by Sync once his term starts.</li>
+          <li>Gina Hinojosa, Governor of Texas: Texas bill signings and vetoes. Added by hand for now.</li>
         </ul>
         <p className="leading-7">
           A vote is shown only after it is copied from one of those public records. A missing link to a
-          promise means we have not tied them. It is not a claim that the vote is unrelated. No roll-call
-          numbers are in the database today.
+          promise means we have not tied them. It is not a claim that the vote is unrelated.
         </p>
       </section>
 
@@ -61,21 +60,20 @@ export default function RoadmapPage() {
           The goal is to show who contributed, with the filing that proves the name and the amount.
         </p>
         <ul className="list-disc space-y-2 pl-5 leading-7">
-          <li>James Talarico: FEC filings.</li>
-          <li>Gina Hinojosa: Texas Ethics Commission reports.</li>
+          <li>James Talarico: FEC filings. Loaded by Sync.</li>
+          <li>Gina Hinojosa: Texas Ethics Commission reports. Not automated yet.</li>
         </ul>
         <p className="leading-7">
           A contributor is named only when that filing is linked. Amounts come from the filing, not from
-          an estimate. The site will not rank donors or imply that a gift bought a promise. No
-          contribution rows are stored today.
+          an estimate. The site will not rank donors or imply that a gift bought a promise.
         </p>
       </section>
 
       <section className="space-y-2">
         <h2 className="text-2xl">Help build it</h2>
         <p className="leading-7">
-          Both items are not started. The GitHub repo has issue templates for a voting-record plan and a
-          donations plan, plus templates for a new promise and a status change. Do not attach invented
+          Automating the governor&apos;s records and the Texas Ethics Commission reports has not started. The
+          GitHub repo has issue templates for a voting-record plan and a donations plan, plus templates for a new promise and a status change. Do not attach invented
           rows to make a demo.
         </p>
         <p>

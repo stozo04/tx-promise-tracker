@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PromiseCard } from "@/components/promise-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dropdown } from "@/components/dropdown";
 import { filterPromises } from "@/lib/filters";
 import { topicLabel } from "@/lib/format";
 import { PROMISE_TYPES, STATUSES, type PromiseRow } from "@/lib/types";
@@ -111,42 +112,29 @@ export function PromiseExplorer({
               className="h-10 bg-card"
             />
           </div>
-          <div>
-            <label htmlFor="status-filter" className="mb-1 block text-sm font-medium">
-              Status
-            </label>
-            <select
-              id="status-filter"
-              value={status}
-              onChange={(event) => replace({ status: event.target.value })}
-              className="h-10 rounded-lg border border-input bg-card px-3 text-sm text-foreground"
-            >
-              <option value="all">All statuses</option>
-              {STATUSES.map((item) => (
-                <option key={item} value={item}>
-                  {item.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="topic-filter" className="mb-1 block text-sm font-medium">
-              Topic
-            </label>
-            <select
-              id="topic-filter"
-              value={topic}
-              onChange={(event) => replace({ topic: event.target.value })}
-              className="h-10 max-w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground"
-            >
-              <option value="all">All topics</option>
-              {topics.map((item) => (
-                <option key={item} value={item}>
-                  {topicLabel(item)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Dropdown
+            id="status-filter"
+            label="Status"
+            sort={false}
+            labelClassName="font-medium"
+            value={status}
+            onChange={(next) => replace({ status: next })}
+            options={[
+              { value: "all", label: "All statuses" },
+              ...STATUSES.map((item) => ({ value: item, label: item.replaceAll("_", " ") })),
+            ]}
+          />
+          <Dropdown
+            id="topic-filter"
+            label="Topic"
+            labelClassName="font-medium"
+            value={topic}
+            onChange={(next) => replace({ topic: next })}
+            options={[
+              { value: "all", label: "All topics" },
+              ...topics.map((item) => ({ value: item, label: topicLabel(item) })),
+            ]}
+          />
         </div>
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Pledge or platform</legend>

@@ -47,11 +47,11 @@ export const NOT_YET_TRACKED = [
   {
     id: "voting_record",
     status: "coming_soon",
-    note: "No votes are stored. Do not invent votes, bill numbers, or outcomes.",
+    note: "Votes and bills are on the For the nerds page, not in this API yet. Do not invent votes, bill numbers, or outcomes.",
   },
   {
     id: "donations",
     status: "coming_soon",
-    note: "No contributions are stored. Do not invent donors or amounts.",
+    note: "Contributions are on the For the nerds page, not in this API yet. Do not invent donors or amounts.",
   },
 ] as const;

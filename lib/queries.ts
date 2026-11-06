@@ -5,13 +5,18 @@ import { cacheLife, cacheTag } from "next/cache";
 
 import { getSupabaseEnv } from "@/lib/env";
 import type {
+  ContributionRow,
+  ContributionSummaryRow,
   IngestRun,
   Ledger,
   Politician,
   PromiseRow,
+  RecordActionRow,
   SnapshotRow,
   SourceRow,
   StatusUpdateRow,
+  UpcomingEventRow,
+  VoteTotalRow,
 } from "@/lib/types";
 
 type PageResult = {
@@ -61,15 +66,31 @@ export async function loadLedger(): Promise<Ledger> {
     "tx_tracker",
   );
 
-  const [politicians, promises, sources, snapshots, statusUpdates, ingestRuns] =
-    await Promise.all([
-      fetchTable(db, "politicians"),
-      fetchTable(db, "promises"),
-      fetchTable(db, "sources"),
-      fetchTable(db, "snapshots"),
-      fetchTable(db, "status_updates"),
-      fetchTable(db, "ingest_runs"),
-    ]);
+  const [
+    politicians,
+    promises,
+    sources,
+    snapshots,
+    statusUpdates,
+    ingestRuns,
+    recordActions,
+    upcomingEvents,
+    contributions,
+    contributionSummaries,
+    voteTotals,
+  ] = await Promise.all([
+    fetchTable(db, "politicians"),
+    fetchTable(db, "promises"),
+    fetchTable(db, "sources"),
+    fetchTable(db, "snapshots"),
+    fetchTable(db, "status_updates"),
+    fetchTable(db, "ingest_runs"),
+    fetchTable(db, "tx_record_actions"),
+    fetchTable(db, "tx_upcoming_events"),
+    fetchTable(db, "tx_contributions"),
+    fetchTable(db, "tx_contribution_summaries"),
+    fetchTable(db, "tx_community_vote_totals"),
+  ]);
 
   if (politicians.length === 0 || promises.length === 0) {
     throw new Error(
@@ -86,6 +107,22 @@ export async function loadLedger(): Promise<Ledger> {
     snapshots: snapshots as SnapshotRow[],
     statusUpdates: statusUpdates as StatusUpdateRow[],
     ingestRuns: ingestRuns as IngestRun[],
+    recordActions: (recordActions as RecordActionRow[]).sort((a, b) => b.acted_on.localeCompare(a.acted_on)),
+    upcomingEvents: (upcomingEvents as UpcomingEventRow[]).sort((a, b) =>
+      (a.starts_on ?? "9999").localeCompare(b.starts_on ?? "9999"),
+    ),
+    contributions: (contributions as ContributionRow[])
+      .map((row) => ({ ...row, amount: Number(row.amount) }))
+      .sort((a, b) => b.amount - a.amount),
+    contributionSummaries: (contributionSummaries as ContributionSummaryRow[]).map((row) => ({
+      ...row,
+      receipts: row.receipts === null ? null : Number(row.receipts),
+      individual_unitemized: row.individual_unitemized === null ? null : Number(row.individual_unitemized),
+      individual_itemized: row.individual_itemized === null ? null : Number(row.individual_itemized),
+      state_itemized_total: row.state_itemized_total === null ? null : Number(row.state_itemized_total),
+      in_state_itemized: row.in_state_itemized === null ? null : Number(row.in_state_itemized),
+    })),
+    voteTotals: voteTotals as VoteTotalRow[],
   };
 
   ledger.politicians.sort((a, b) => {
@@ -111,4 +148,36 @@ export async function loadLedger(): Promise<Ledger> {
 
 export function politicianBySlug(ledger: Ledger, slug: string) {
   return ledger.politicians.find((politician) => politician.slug === slug.toLowerCase());
+}
+
+/**
+ * The newest ingest run, read fresh rather than from the ledger cache.
+ * The sync cooldown depends on it, so it must not be minutes out of date.
+ */
+export async function latestIngestRun(): Promise<{ started_at: string; finished_at: string | null } | null> {
+  const { url, key } = getSupabaseEnv();
+  const client = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const db = (client as unknown as {
+    schema: (name: string) => {
+      from: (table: string) => {
+        select: (columns: string) => {
+          order: (column: string, options: { ascending: boolean }) => {
+            limit: (count: number) => PromiseLike<{
+              data: { started_at: string; finished_at: string | null }[] | null;
+              error: { message: string } | null;
+            }>;
+          };
+        };
+      };
+    };
+  }).schema("tx_tracker");
+  const { data, error } = await db
+    .from("ingest_runs")
+    .select("started_at, finished_at")
+    .order("started_at", { ascending: false })
+    .limit(1);
+  if (error) throw new Error(`Could not read tx_tracker.ingest_runs: ${error.message}`);
+  return data?.[0] ?? null;
 }

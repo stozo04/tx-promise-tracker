@@ -218,3 +218,51 @@
     transition: none !important;
   }
 }
+
+/* Promise vs. Delivered: the Texas flag panel and the Said / Did cards.
+   Said cards use the flag's blue and Did cards use the flag's red, so the
+   colors read in the same order as the flag above them. */
+:root {
+  --flag-blue: #bac6dd;
+  --flag-white: #fbfaf7;
+  --flag-red: #e6c3c9;
+  --flag-star: #ffffff;
+  --said-bg: #bac6dd;
+  --said-border: #a3b3d1;
+  --did-bg: #e6c3c9;
+  --did-border: #d6a9b1;
+  --match-fg: #0b5e4e;
+  --match-bg: #ddeee8;
+  --against-fg: #a8460f;
+  --against-bg: #f8e3d6;
+  --partly-fg: #6e4605;
+  --partly-bg: #f6e7c8;
+}
+
+.dark {
+  --flag-blue: #18284a;
+  --flag-white: #1f242c;
+  --flag-red: #3b1a22;
+  --flag-star: #2e4069;
+  --said-bg: #18284a;
+  --said-border: #2a3d66;
+  --did-bg: #3b1a22;
+  --did-border: #5a2a35;
+  --match-fg: #5ccdaf;
+  --match-bg: #12352e;
+  --against-fg: #f59a5c;
+  --against-bg: #3d2416;
+  --partly-fg: #f0c674;
+  --partly-bg: #3a2c10;
+}
+
+[id^="action-"]:target {
+  outline: 3px solid currentColor;
+  outline-offset: 6px;
+  border-radius: 0.75rem;
+}
+
+[id^="action-"],
+[id^="pledge-"] {
+  scroll-margin-top: 6rem;
+}

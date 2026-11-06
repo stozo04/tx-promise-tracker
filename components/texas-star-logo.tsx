@@ -1,0 +1,25 @@
+import { useId } from "react";
+
+/**
+ * The site logo: a five-point star filled with the Texas flag
+ * (blue hoist with a white star, white over red on the fly). Transparent background.
+ */
+export function TexasStarLogo({ className }: { className?: string }) {
+  const clipId = useId();
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden="true" className={className}>
+      <defs>
+        <clipPath id={clipId}>
+          <path d="M50.00 5.00 L60.78 38.17 L95.65 38.17 L67.44 58.67 L78.21 91.83 L50.00 71.34 L21.79 91.83 L32.56 58.67 L4.35 38.17 L39.22 38.17Z" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clipId})`}>
+        <rect x="0" y="0" width="56.72" height="100" fill="#343C68" />
+        <rect x="56.72" y="0" width="43.28" height="51.56" fill="#F7F7F5" />
+        <rect x="56.72" y="51.56" width="43.28" height="48.44" fill="#BF3040" />
+      </g>
+      <path d="M41.84 41.00 L44.10 47.96 L51.43 47.97 L45.50 52.27 L47.76 59.23 L41.84 54.93 L35.92 59.23 L38.18 52.27 L32.25 47.97 L39.58 47.96Z" fill="#F7F7F5" />
+      <path d="M50.00 5.00 L60.78 38.17 L95.65 38.17 L67.44 58.67 L78.21 91.83 L50.00 71.34 L21.79 91.83 L32.56 58.67 L4.35 38.17 L39.22 38.17Z" fill="none" stroke="#343C68" strokeWidth="1" strokeLinejoin="round" />
+    </svg>
+  );
+}

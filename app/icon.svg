@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="14" fill="#F4EFE4"/>
-  <path fill="#31408F" d="M32 8.5 38.8 24.4 55.6 25.6 43 36.2 46.7 52.4 32 44 17.3 52.4 21 36.2 8.4 25.6 25.2 24.4 32 8.5Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><clipPath id="tx-star"><path d="M50.00 5.00 L60.78 38.17 L95.65 38.17 L67.44 58.67 L78.21 91.83 L50.00 71.34 L21.79 91.83 L32.56 58.67 L4.35 38.17 L39.22 38.17Z"/></clipPath></defs>
+  <g clip-path="url(#tx-star)">
+    <rect x="0" y="0" width="56.72" height="100" fill="#343C68"/>
+    <rect x="56.72" y="0" width="43.28" height="51.56" fill="#F7F7F5"/>
+    <rect x="56.72" y="51.56" width="43.28" height="48.44" fill="#BF3040"/>
+  </g>
+  <path d="M41.84 41.00 L44.10 47.96 L51.43 47.97 L45.50 52.27 L47.76 59.23 L41.84 54.93 L35.92 59.23 L38.18 52.27 L32.25 47.97 L39.58 47.96Z" fill="#F7F7F5"/>
+  <path d="M50.00 5.00 L60.78 38.17 L95.65 38.17 L67.44 58.67 L78.21 91.83 L50.00 71.34 L21.79 91.83 L32.56 58.67 L4.35 38.17 L39.22 38.17Z" fill="none" stroke="#343C68" stroke-width="1" stroke-linejoin="round"/>
 </svg>
