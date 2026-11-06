@@ -19,8 +19,8 @@ jobs:
     name: Lint, typecheck and build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -36,13 +36,15 @@ jobs:
     name: Deno check Edge Functions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
       - name: deno check
         run: |
+          # The repo-root package.json would make Deno look for packages in node_modules,
+          # which this job never installs. Use Deno's own package cache instead.
           for fn in supabase/functions/*/index.ts; do
             echo "Checking $fn"
-            deno check "$fn"
+            deno check --node-modules-dir=none "$fn"
           done
