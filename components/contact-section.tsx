@@ -34,6 +34,15 @@ export function ContactSection({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2.5">
+        {campaignHref ? (
+          <a
+            href={campaignHref}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border-2 border-foreground px-4 text-sm font-bold"
+          >
+            Their campaign website
+            <ExternalLink className="size-4" aria-hidden="true" />
+          </a>
+        ) : null}
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
@@ -44,15 +53,6 @@ export function ContactSection({
           <Phone className="size-4" aria-hidden="true" />
           {open ? "Hide contact info" : "Contact them"}
         </button>
-        {campaignHref ? (
-          <a
-            href={campaignHref}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border-2 border-foreground px-4 text-sm font-bold"
-          >
-            Their campaign website
-            <ExternalLink className="size-4" aria-hidden="true" />
-          </a>
-        ) : null}
       </div>
 
       {open ? (
