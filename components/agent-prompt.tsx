@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 
-import { SITE_NAME } from "@/lib/site";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 /** The prompt a person pastes into their own AI agent so it can answer questions from this site. */
 export function agentPrompt(origin: string) {
@@ -42,17 +42,10 @@ RULES
 Start by fetching ${origin}/api/politicians and telling me who is tracked and how many promises each has.`;
 }
 
-const noSubscribe = () => () => {};
-
-export function AgentPrompt({ fallbackOrigin }: { fallbackOrigin: string }) {
-  const origin = useSyncExternalStore(
-    noSubscribe,
-    () => window.location.origin,
-    () => fallbackOrigin,
-  );
+export function AgentPrompt() {
   const [copied, setCopied] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
-  const prompt = agentPrompt(origin);
+  const prompt = agentPrompt(SITE_URL);
 
   useEffect(() => {
     if (!copied) return;

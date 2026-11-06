@@ -19,7 +19,7 @@ export default function AgentsPage() {
           the answer with sources, and your mouse gets the day off.
         </p>
       </header>
-      <AgentPrompt fallbackOrigin={process.env.NEXT_PUBLIC_SITE_URL ?? ""} />
+      <AgentPrompt />
       <p className="text-sm">
         <a className="font-semibold text-bluebonnet underline" href="/llms.txt">
           llms.txt
