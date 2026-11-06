@@ -4,7 +4,7 @@ An independent public ledger of what James Talarico and Gina Hinojosa promised, 
 
 This is not a campaign site and not a site of the State of Texas. It only shows records that are stored. It does not invent quotes, votes, or donors.
 
-The promise data is read from the Supabase schema `tx_tracker`. The website never writes to it.
+The data lives in the Supabase schema `tx_tracker`. The website only reads it. The only writes go through two Supabase Edge Functions, `tx_community_vote` and `tx_sync`, described under [Supabase](#supabase).
 
 ## Run it locally
 
@@ -62,7 +62,7 @@ Read only.
 - `GET /api/promises/{id}`
 - `GET /api/sources`
 - `GET /api/openapi.json`
-- `GET /api/sync` and `POST /api/sync`: the site-wide sync cooldown. One sync per 24 hours. Inside the window `POST` answers `429` with `retry_after_seconds`. Outside it, `POST` answers `503` until the ingest pipeline is connected.
+- `GET /api/sync`: where the site-wide sync cooldown stands. The sync itself is `POST {NEXT_PUBLIC_SUPABASE_URL}/functions/v1/tx_sync`.
 
 `type` is `explicit_pledge` or `platform`. `status` is `pending`, `in_progress`, `kept`, `partial`, `broken`, `superseded`, or `unverified`.
 
@@ -72,7 +72,7 @@ Voting records and donations are not in the API. The field `not_yet_tracked` say
 
 ## Contributing
 
-Issues and pull requests are welcome at [stozo04/tx-promise-tracker](https://github.com/stozo04/tx-promise-tracker). Use the issue templates. The site stays read-only: do not add a write path to Supabase.
+Issues and pull requests are welcome at [stozo04/tx-promise-tracker](https://github.com/stozo04/tx-promise-tracker). Use the issue templates. The website itself stays read-only. Writes go only through the Edge Functions in `supabase/functions`.
 
 ### Suggest a promise
 
@@ -97,27 +97,40 @@ Open an issue with the template **Propose a status change**. Include:
 
 A status does not change on a hunch. Pending stays pending until the evidence is public.
 
-## Backlog
-
-Two records are planned and **not started**. There is no sample data for either. See [ROADMAP.md](ROADMAP.md) and the coming-soon cards on the home page, each politician page, and [/roadmap](/roadmap).
+## Records, money, and community votes
 
 ### Voting record
 
-Show how each official votes once they are in office, linked to a promise only when the vote actually relates to it.
+- **James Talarico:** bills he sponsors or co-sponsors (Congress.gov) and his Senate roll-call votes (senate.gov), loaded by Sync once his term starts.
+- **Gina Hinojosa:** bill signings, vetoes, and executive orders are added by hand for now. Texas Legislature Online and the Office of the Governor are not automated yet.
 
-- James Talarico: Congress.gov and Senate roll calls
-- Gina Hinojosa: Texas bill signings and vetoes
-
-Use the **Voting record plan** issue template. Do not add sample votes.
+A record is tied to a promise (`promise_id`) only when it really bears on it. A missing link is not a claim that it is unrelated.
 
 ### Donations
 
-Show who contributed, with the filing that proves the name and the amount.
+- **James Talarico:** FEC totals for the cycle, the share from donors giving $200 or less, the Texas share of itemized individual dollars, donors' top employers, and the 100 largest itemized individual gifts, each linked to the filing that reports it.
+- **Gina Hinojosa:** Texas Ethics Commission reports are not automated yet.
 
-- James Talarico: FEC filings
-- Gina Hinojosa: Texas Ethics Commission reports
+Do not rank donors as a judgment or imply that a gift bought a promise.
 
-Use the **Donations plan** issue template. Do not add sample donors or amounts.
+### Community votes
+
+Each action in a Did card and each record on the For the nerds page has a "How would you vote?" box. One vote per connection per item: the Edge Function hashes the visitor's IP with a private salt and keeps only the hash, and a second vote from the same hash is refused. Results stay hidden until you vote. It is not a scientific poll, and the page says so.
+
+### Sync
+
+Anyone can press Sync, but the whole site gets one sync per 24 hours. `tx_tracker.tx_claim_sync()` claims the slot under an advisory lock, so two presses at once cannot both start one. Inside the window the button says how long to wait. Each source runs on its own, and its counts, notes, and errors are written to `tx_tracker.ingest_runs`.
+
+## Supabase
+
+Everything for this project is prefixed `tx_`.
+
+- `supabase/migrations/`: the `tx_` tables (`tx_record_actions`, `tx_upcoming_events`, `tx_contributions`, `tx_contribution_summaries`, `tx_community_votes`, `tx_private_settings`), the `tx_community_vote_totals` view, and `tx_claim_sync()`. Public roles can read records and vote totals. They cannot read raw votes or private settings, and they cannot write.
+- `supabase/functions/tx_community_vote`: `GET ?items=status_update:<id>,record_action:<id>` returns your vote and the totals. `POST {item_type, item_id, choice}` records a vote, or answers `409` "You've already voted on this."
+- `supabase/functions/tx_sync`: `POST` starts a sync, or answers `429` with how long to wait.
+- `tx_tracker.tx_private_settings` holds the IP hash salt and the api.data.gov key (Congress.gov and FEC). Only `service_role` can read it. An Edge Function secret named `TX_DATA_GOV_API_KEY` takes precedence if you set one.
+
+Both functions are deployed with JWT verification off because they are public by design and check their own input.
 
 ## Deploy on Vercel
 

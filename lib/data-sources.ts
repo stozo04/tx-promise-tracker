@@ -73,7 +73,7 @@ export const DATA_SOURCES: DataSource[] = [
     why: "It is the official record of Congress",
     href: "https://www.congress.gov",
     linkText: "congress.gov",
-    state: "planned",
+    state: "live",
     offices: ["us_senate"],
   },
   {
@@ -84,7 +84,7 @@ export const DATA_SOURCES: DataSource[] = [
     why: "The Senate clerk records each vote as it happens",
     href: "https://www.senate.gov",
     linkText: "senate.gov",
-    state: "planned",
+    state: "live",
     offices: ["us_senate"],
   },
   {
@@ -95,7 +95,7 @@ export const DATA_SOURCES: DataSource[] = [
     why: "Campaigns must file these reports by law",
     href: "https://www.fec.gov",
     linkText: "fec.gov",
-    state: "planned",
+    state: "live",
     offices: ["us_senate"],
   },
   {

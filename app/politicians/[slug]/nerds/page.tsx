@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { NerdsTabs } from "@/components/nerds-tabs";
 import { screenshotCards } from "@/lib/archives";
 import { dataSourcesFor } from "@/lib/data-sources";
+import { termYears } from "@/lib/delivered";
 import { officeLabel } from "@/lib/format";
 import { loadLedger, politicianBySlug } from "@/lib/queries";
 import { teasersFor } from "@/lib/roadmap";
@@ -38,6 +39,21 @@ export default async function NerdsPage({ params }: Props) {
     null,
   );
 
+  const records = ledger.recordActions.filter((row) => row.politician_id === politician.id);
+  const upcoming = ledger.upcomingEvents.filter((row) => row.politician_id === politician.id);
+  const contributions = ledger.contributions.filter((row) => row.politician_id === politician.id);
+  const summary =
+    ledger.contributionSummaries
+      .filter((row) => row.politician_id === politician.id)
+      .sort((a, b) => b.cycle - a.cycle)[0] ?? null;
+  const years = [
+    ...new Set([
+      ...termYears(politician),
+      ...records.map((row) => row.acted_on.slice(0, 4)),
+      ...upcoming.map((row) => row.starts_on?.slice(0, 4)).filter((value): value is string => Boolean(value)),
+    ]),
+  ].sort();
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10">
       <header className="flex flex-col gap-3">
@@ -52,6 +68,11 @@ export default async function NerdsPage({ params }: Props) {
         dataSources={dataSourcesFor(politician.office)}
         teasers={teasersFor(politician.slug)}
         lastSyncedAt={lastSyncedAt}
+        records={records}
+        upcoming={upcoming}
+        contributions={contributions}
+        summary={summary}
+        years={years}
       />
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
+import { functionUrl } from "@/lib/community";
 import { cooldownRemaining, formatAgo, formatWait } from "@/lib/sync";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +29,7 @@ export function SyncButton({ lastSyncedAt }: { lastSyncedAt: string | null }) {
     setBusy(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/sync", { method: "POST" });
+      const response = await fetch(functionUrl("tx_sync"), { method: "POST" });
       const body = (await response.json()) as { message?: string; last_synced_at?: string | null };
       if (body.last_synced_at) setLast(body.last_synced_at);
       setMessage(body.message ?? (response.ok ? "Sync started." : "Sync did not start."));

@@ -66,6 +66,7 @@ export default async function PoliticianPage({ params }: Props) {
         promises={delivered.filter((promise) => promise.actions.length > 0)}
         years={termYears(politician)}
         emptyNote={emptyNote}
+        role={politician.office === "governor" ? "governor" : "senator"}
       />
 
       <section aria-labelledby="every-promise" className="flex flex-col gap-4">

@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
+import { CommunityVote } from "@/components/community-vote";
 import { DirectionChip } from "@/components/direction-chip";
 import { StatusPill } from "@/components/status-pill";
 import type { DeliveredPromise } from "@/lib/delivered";
@@ -18,10 +19,12 @@ export function SaidDid({
   promises,
   years,
   emptyNote,
+  role,
 }: {
   promises: DeliveredPromise[];
   years: string[];
   emptyNote: string;
+  role: string;
 }) {
   const [year, setYear] = useState("all");
   const selectId = useId();
@@ -129,6 +132,14 @@ export function SaidDid({
                           <ExternalLink className="size-3.5" aria-hidden="true" />
                         </a>
                       ) : null}
+                      <CommunityVote
+                        itemType="status_update"
+                        itemId={action.id}
+                        question="Do you support this?"
+                        stanceText={`The ${role} did this`}
+                        officialStance="support"
+                        role={role}
+                      />
                     </li>
                   ))}
                 </ol>

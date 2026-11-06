@@ -102,6 +102,74 @@ export type IngestRun = {
   notes: string | null;
 };
 
+export type RecordActionRow = {
+  id: string;
+  politician_id: string;
+  kind: "vote" | "signed" | "vetoed" | "filed_without_signature" | "sponsored" | "cosponsored" | "executive_order";
+  bill_id: string | null;
+  title: string;
+  what_it_does: string | null;
+  position: "yea" | "nay" | "present" | "not_voting" | null;
+  result: string | null;
+  acted_on: string;
+  source_name: string;
+  source_url: string;
+  promise_id: string | null;
+  external_id: string;
+  created_at: string;
+};
+
+export type UpcomingEventRow = {
+  id: string;
+  politician_id: string;
+  title: string;
+  starts_on: string | null;
+  when_label: string | null;
+  source_name: string;
+  source_url: string;
+  external_id: string;
+  created_at: string;
+};
+
+export type ContributionRow = {
+  id: string;
+  politician_id: string;
+  contributor_name: string;
+  contributor_city: string | null;
+  contributor_state: string | null;
+  contributor_employer: string | null;
+  amount: number;
+  contributed_on: string | null;
+  filing_id: string | null;
+  source_name: string;
+  source_url: string;
+  external_id: string;
+  created_at: string;
+};
+
+export type ContributionSummaryRow = {
+  id: string;
+  politician_id: string;
+  cycle: number;
+  receipts: number | null;
+  individual_unitemized: number | null;
+  individual_itemized: number | null;
+  state_itemized_total: number | null;
+  in_state_itemized: number | null;
+  top_employers: { employer: string; total: number }[];
+  coverage_end_date: string | null;
+  source_name: string;
+  source_url: string;
+  updated_at: string;
+};
+
+export type VoteTotalRow = {
+  item_type: "status_update" | "record_action";
+  item_id: string;
+  support: number;
+  oppose: number;
+};
+
 export type Ledger = {
   fetchedAt: string;
   supabaseUrl: string;
@@ -111,6 +179,11 @@ export type Ledger = {
   snapshots: SnapshotRow[];
   statusUpdates: StatusUpdateRow[];
   ingestRuns: IngestRun[];
+  recordActions: RecordActionRow[];
+  upcomingEvents: UpcomingEventRow[];
+  contributions: ContributionRow[];
+  contributionSummaries: ContributionSummaryRow[];
+  voteTotals: VoteTotalRow[];
 };
 
 export type ArchiveCard = {

@@ -1,14 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, RefreshCw } from "lucide-react";
 
+import { CommunityVote } from "@/components/community-vote";
 import { SyncButton } from "@/components/sync-button";
+import { actionLabel, officialStance, stanceText } from "@/lib/community";
 import type { DataSource } from "@/lib/data-sources";
+import { formatLongDate, formatNumber } from "@/lib/format";
 import type { Teaser } from "@/lib/roadmap";
-import type { ArchiveCard } from "@/lib/types";
+import type {
+  ArchiveCard,
+  ContributionRow,
+  ContributionSummaryRow,
+  RecordActionRow,
+  UpcomingEventRow,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Tab = "upcoming" | "record" | "money" | "site" | "data";
@@ -36,6 +45,17 @@ function NotLoaded({ teaser, lead }: { teaser?: Teaser; lead: string }) {
   );
 }
 
+function formatMoney(value: number | null) {
+  if (value === null) return "Not reported";
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  return `$${formatNumber(Math.round(value))}`;
+}
+
+function share(part: number | null, whole: number | null) {
+  if (part === null || whole === null || whole === 0) return "Not reported";
+  return `${Math.round((part / whole) * 100)}%`;
+}
+
 export function NerdsTabs({
   name,
   office,
@@ -43,6 +63,11 @@ export function NerdsTabs({
   dataSources,
   teasers,
   lastSyncedAt,
+  records,
+  upcoming,
+  contributions,
+  summary,
+  years,
 }: {
   name: string;
   office: string;
@@ -50,8 +75,20 @@ export function NerdsTabs({
   dataSources: DataSource[];
   teasers: Teaser[];
   lastSyncedAt: string | null;
+  records: RecordActionRow[];
+  upcoming: UpcomingEventRow[];
+  contributions: ContributionRow[];
+  summary: ContributionSummaryRow | null;
+  years: string[];
 }) {
   const [tab, setTab] = useState<Tab>("upcoming");
+  const [year, setYear] = useState("all");
+  const yearId = useId();
+  const role = office === "governor" ? "governor" : "senator";
+  const shownRecords = year === "all" ? records : records.filter((row) => row.acted_on.startsWith(year));
+  const shownUpcoming =
+    year === "all" ? upcoming : upcoming.filter((row) => !row.starts_on || row.starts_on.startsWith(year));
+  const showYear = tab === "upcoming" || tab === "record";
   const votes = teasers.find((teaser) => teaser.id === "voting_record");
   const money = teasers.find((teaser) => teaser.id === "donations");
   const isGovernor = office === "governor";
@@ -83,38 +120,213 @@ export function NerdsTabs({
             </button>
           ))}
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          {showYear && years.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <label htmlFor={yearId} className="text-sm font-bold">
+                Year
+              </label>
+              <select
+                id={yearId}
+                value={year}
+                onChange={(event) => setYear(event.target.value)}
+                className="min-h-11 rounded-xl border-2 border-foreground bg-card px-3 text-sm font-bold"
+              >
+                <option value="all">All years</option>
+                {years.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <SyncButton lastSyncedAt={lastSyncedAt} />
         </div>
       </div>
 
       {tab === "upcoming" ? (
-        <NotLoaded
-          lead={
-            isGovernor
-              ? `Upcoming bill deadlines, special sessions, and signing dates for ${name} are not loaded yet.`
-              : `Upcoming Senate votes and committee hearings for ${name} are not loaded yet.`
-          }
-          teaser={votes}
-        />
+        upcoming.length === 0 ? (
+          <NotLoaded
+            lead={
+              isGovernor
+                ? `Upcoming bill deadlines, special sessions, and signing dates for ${name} are not loaded yet.`
+                : `Upcoming Senate votes and committee hearings for ${name} are not loaded yet.`
+            }
+            teaser={votes}
+          />
+        ) : shownUpcoming.length === 0 ? (
+          <p className="rounded-3xl border border-dashed px-5 py-8">Nothing scheduled for {year} yet.</p>
+        ) : (
+          <ul className="flex flex-col rounded-3xl border border-border bg-card">
+            {shownUpcoming.map((event) => (
+              <li
+                key={event.id}
+                className="grid gap-x-5 gap-y-1 border-b border-border px-5 py-4 last:border-b-0 sm:grid-cols-[11rem_minmax(0,1fr)]"
+              >
+                <span className="font-extrabold">{event.when_label ?? formatLongDate(event.starts_on) ?? "Date not set"}</span>
+                <span className="flex flex-col gap-1">
+                  <span className="font-bold">{event.title}</span>
+                  <a href={event.source_url} className="inline-flex items-center gap-1 self-start text-sm text-muted-foreground underline underline-offset-4">
+                    {event.source_name}
+                    <ExternalLink className="size-3.5" aria-hidden="true" />
+                  </a>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )
       ) : null}
 
       {tab === "record" ? (
-        <NotLoaded
-          lead={
-            isGovernor
-              ? "Governors do not vote on bills. They sign them, veto them, or let them become law without a signature. That record is not loaded yet."
-              : "Roll-call votes are not loaded yet. Each vote will be linked to a promise only when it really bears on it."
-          }
-          teaser={votes}
-        />
+        records.length === 0 ? (
+          <NotLoaded
+            lead={
+              isGovernor
+                ? "Governors do not vote on bills. They sign them, veto them, or let them become law without a signature. That record is not loaded yet."
+                : "No roll-call votes or bills are on record yet. They load after the term starts. Each one is tied to a promise only when it really bears on it."
+            }
+            teaser={votes}
+          />
+        ) : shownRecords.length === 0 ? (
+          <p className="rounded-3xl border border-dashed px-5 py-8">Nothing on the record for {year} yet.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {isGovernor ? (
+              <p className="text-muted-foreground">
+                Governors do not vote on bills. They sign them, veto them, or let them become law without a signature.
+              </p>
+            ) : null}
+            <ul className="flex flex-col gap-3">
+              {shownRecords.map((record) => (
+                <li key={record.id} className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="rounded-full border-2 border-foreground px-2.5 py-0.5 font-extrabold">
+                      {actionLabel(record)}
+                    </span>
+                    {record.bill_id ? <span className="font-bold">{record.bill_id}</span> : null}
+                    <span className="text-muted-foreground">{formatLongDate(record.acted_on)}</span>
+                    {record.result ? <span className="text-muted-foreground">· {record.result}</span> : null}
+                  </div>
+                  <p className="font-bold leading-snug">{record.title}</p>
+                  {record.what_it_does ? <p className="text-sm leading-6">{record.what_it_does}</p> : null}
+                  <a href={record.source_url} className="inline-flex items-center gap-1 self-start text-sm font-semibold underline underline-offset-4">
+                    {record.source_name}
+                    <ExternalLink className="size-3.5" aria-hidden="true" />
+                  </a>
+                  <CommunityVote
+                    itemType="record_action"
+                    itemId={record.id}
+                    question="How would you vote?"
+                    stanceText={stanceText(role, record)}
+                    officialStance={officialStance(record)}
+                    role={role}
+                    compact
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
       ) : null}
 
       {tab === "money" ? (
-        <NotLoaded
-          lead="Donations are not loaded yet. A donor is named only when a public filing proves the name and the amount."
-          teaser={money}
-        />
+        !summary ? (
+          <NotLoaded
+            lead="Donations are not loaded yet. A donor is named only when a public filing proves the name and the amount."
+            teaser={money}
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
+            <dl className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-card px-5 py-4">
+                <dt className="sr-only">Raised</dt>
+                <dd className="flex flex-col gap-0.5">
+                  <span className="text-3xl font-black">{formatMoney(summary.receipts)}</span>
+                  <span className="text-sm font-semibold text-muted-foreground">raised in the {summary.cycle} cycle</span>
+                </dd>
+              </div>
+              <div className="rounded-2xl border border-border bg-card px-5 py-4">
+                <dt className="sr-only">Small donors</dt>
+                <dd className="flex flex-col gap-0.5">
+                  <span className="text-3xl font-black">{share(summary.individual_unitemized, summary.receipts)}</span>
+                  <span className="text-sm font-semibold text-muted-foreground">from donors giving $200 or less</span>
+                </dd>
+              </div>
+              <div className="rounded-2xl border border-border bg-card px-5 py-4">
+                <dt className="sr-only">From Texas</dt>
+                <dd className="flex flex-col gap-0.5">
+                  <span className="text-3xl font-black">{share(summary.in_state_itemized, summary.state_itemized_total)}</span>
+                  <span className="text-sm font-semibold text-muted-foreground">of itemized individual dollars from Texas</span>
+                </dd>
+              </div>
+            </dl>
+            <div className="flex flex-wrap gap-4">
+              <section aria-labelledby="top-donors" className="flex flex-[1_1_28rem] flex-col gap-3 rounded-2xl border border-border bg-card p-5">
+                <h2 id="top-donors" className="text-lg font-extrabold">
+                  Largest individual gifts
+                </h2>
+                {contributions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No itemized gifts are stored yet.</p>
+                ) : (
+                  <ol className="flex flex-col">
+                    {contributions.slice(0, 10).map((gift) => (
+                      <li key={gift.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-border py-2.5 last:border-b-0">
+                        <span className="flex flex-col">
+                          <span className="font-semibold">{gift.contributor_name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {[gift.contributor_city, gift.contributor_state].filter(Boolean).join(", ")}
+                            {gift.contributor_employer ? ` · ${gift.contributor_employer}` : ""}
+                            {gift.contributed_on ? ` · ${formatLongDate(gift.contributed_on)}` : ""}
+                          </span>
+                        </span>
+                        <span className="flex items-baseline gap-3">
+                          <span className="font-extrabold">${formatNumber(gift.amount)}</span>
+                          <a href={gift.source_url} className="text-xs font-semibold underline underline-offset-4">
+                            Filing
+                          </a>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+              <section aria-labelledby="top-employers" className="flex flex-[1_1_20rem] flex-col gap-3 rounded-2xl border border-border bg-card p-5">
+                <h2 id="top-employers" className="text-lg font-extrabold">
+                  Donors&apos; employers
+                </h2>
+                {summary.top_employers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Not reported.</p>
+                ) : (
+                  <ol className="flex flex-col gap-2.5">
+                    {summary.top_employers.map((row) => {
+                      const top = summary.top_employers[0]?.total || 1;
+                      return (
+                        <li key={row.employer} className="flex flex-col gap-1">
+                          <span className="flex justify-between gap-3 text-sm">
+                            <span className="font-semibold">{row.employer}</span>
+                            <span className="font-extrabold">{formatMoney(row.total)}</span>
+                          </span>
+                          <span className="h-2 rounded-full bg-secondary">
+                            <span className="block h-2 rounded-full bg-foreground" style={{ width: `${Math.max(2, (row.total / top) * 100)}%` }} />
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </section>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Source:{" "}
+              <a href={summary.source_url} className="font-semibold underline underline-offset-4">
+                {summary.source_name}
+              </a>
+              {summary.coverage_end_date ? ` · Filings through ${formatLongDate(summary.coverage_end_date)}` : ""}. Each gift
+              links to the filing that reports it.
+            </p>
+          </div>
+        )
       ) : null}
 
       {tab === "site" ? (

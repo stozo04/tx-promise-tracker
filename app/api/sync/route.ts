@@ -1,9 +1,11 @@
 import { latestIngestRun } from "@/lib/queries";
-import { cooldownRemaining, formatWait } from "@/lib/sync";
+import { cooldownRemaining } from "@/lib/sync";
 
-const NO_STORE = { "Cache-Control": "no-store" };
-
-/** Where the sync cooldown stands right now. */
+/**
+ * Where the site-wide sync cooldown stands. Read only.
+ * The sync itself runs in the tx_sync Supabase Edge Function, which claims
+ * the once-a-day slot in Postgres so two requests cannot both start one.
+ */
 export async function GET() {
   const run = await latestIngestRun();
   const remaining = cooldownRemaining(run?.started_at ?? null, Date.now());
@@ -13,39 +15,8 @@ export async function GET() {
       last_synced_at: run?.started_at ?? null,
       can_sync: remaining === 0,
       retry_after_seconds: Math.ceil(remaining / 1000),
+      sync_endpoint: "POST {NEXT_PUBLIC_SUPABASE_URL}/functions/v1/tx_sync",
     },
-    { headers: NO_STORE },
-  );
-}
-
-/**
- * Ask for a sync. Allowed once every 24 hours for the whole site.
- * Inside the cooldown it answers 429 with how long to wait.
- * Outside it, it answers 503 until the ingest pipeline is connected (phase 2).
- */
-export async function POST() {
-  const run = await latestIngestRun();
-  const remaining = cooldownRemaining(run?.started_at ?? null, Date.now());
-  if (remaining > 0) {
-    const seconds = Math.ceil(remaining / 1000);
-    return Response.json(
-      {
-        ok: false,
-        reason: "cooldown",
-        last_synced_at: run?.started_at ?? null,
-        retry_after_seconds: seconds,
-        message: `Someone synced recently. Please wait ${formatWait(remaining)} before syncing again.`,
-      },
-      { status: 429, headers: { ...NO_STORE, "Retry-After": String(seconds) } },
-    );
-  }
-  return Response.json(
-    {
-      ok: false,
-      reason: "not_connected",
-      last_synced_at: run?.started_at ?? null,
-      message: "The sync pipeline is not connected yet. Records are still loaded by hand.",
-    },
-    { status: 503, headers: NO_STORE },
+    { headers: { "Cache-Control": "no-store" } },
   );
 }
