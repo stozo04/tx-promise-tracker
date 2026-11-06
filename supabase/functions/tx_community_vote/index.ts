@@ -7,11 +7,28 @@
 // POST { item_type, item_id, choice: "support" | "oppose" } -> records the vote
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
-};
+// Only this site may call the vote endpoint from a browser: production, its Vercel
+// previews, and local dev. Other sites get no CORS headers, and POSTs from them are refused.
+const ALLOWED_ORIGINS = [
+  /^https:\/\/tx-promise-tracker\.vercel\.app$/,
+  /^https:\/\/tx-promise-tracker-[a-z0-9-]+-steven-gates-projects\.vercel\.app$/,
+  /^http:\/\/localhost(:\d+)?$/,
+];
+
+function allowedOrigin(origin: string | null) {
+  return origin !== null && ALLOWED_ORIGINS.some((pattern) => pattern.test(origin));
+}
+
+function corsFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin");
+  if (!allowedOrigin(origin)) return { Vary: "Origin" };
+  return {
+    "Access-Control-Allow-Origin": origin!,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+    Vary: "Origin",
+  };
+}
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   db: { schema: "tx_tracker" },
@@ -25,10 +42,10 @@ const ITEM_TABLES: Record<string, string> = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_ITEMS = 50;
 
-function reply(body: unknown, status = 200) {
+function reply(cors: Record<string, string>, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 }
 
@@ -41,10 +58,19 @@ async function salt() {
   return saltCache;
 }
 
-function clientIp(req: Request) {
+// Prefer headers the caller cannot set. Cloudflare, in front of Supabase, overwrites
+// cf-connecting-ip with the real address. x-forwarded-for comes last because its
+// leftmost entry is whatever the caller sent, so it is only a fallback.
+const IP_HEADERS = ["cf-connecting-ip", "x-real-ip"] as const;
+
+function clientIp(req: Request): { ip: string | null; source: string } {
+  for (const name of IP_HEADERS) {
+    const value = req.headers.get(name)?.trim();
+    if (value) return { ip: value, source: name };
+  }
   const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip");
+  if (forwarded) return { ip: forwarded.split(",")[0].trim(), source: "x-forwarded-for" };
+  return { ip: null, source: "none" };
 }
 
 async function ipHash(ip: string) {
@@ -94,10 +120,13 @@ async function describe(items: { type: string; id: string }[], hash: string | nu
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  const cors = corsFor(req);
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  const send = (body: unknown, status = 200) => reply(cors, body, status);
 
   try {
-    const ip = clientIp(req);
+    const { ip, source } = clientIp(req);
+    if (source !== "cf-connecting-ip") console.warn(`Client IP came from ${source}, not cf-connecting-ip.`);
     const hash = ip ? await ipHash(ip) : null;
 
     if (req.method === "GET") {
@@ -112,28 +141,31 @@ Deno.serve(async (req) => {
           return { type, id };
         })
         .filter((item) => validItem(item.type, item.id));
-      return reply({ ok: true, items: await describe(items, hash) });
+      return send({ ok: true, items: await describe(items, hash) });
     }
 
-    if (req.method !== "POST") return reply({ ok: false, error: "Use GET or POST." }, 405);
-    if (!hash) return reply({ ok: false, reason: "no_ip", message: "We could not identify your connection, so the vote was not counted." }, 400);
+    if (req.method !== "POST") return send({ ok: false, error: "Use GET or POST." }, 405);
+    if (!allowedOrigin(req.headers.get("origin"))) {
+      return send({ ok: false, reason: "bad_origin", message: "Votes can only be cast on Promise vs. Delivered." }, 403);
+    }
+    if (!hash) return send({ ok: false, reason: "no_ip", message: "We could not identify your connection, so the vote was not counted." }, 400);
 
     let body: { item_type?: unknown; item_id?: unknown; choice?: unknown };
     try {
       body = await req.json();
     } catch {
-      return reply({ ok: false, error: "Send JSON." }, 400);
+      return send({ ok: false, error: "Send JSON." }, 400);
     }
     const { item_type, item_id, choice } = body;
     if (!validItem(item_type, item_id) || (choice !== "support" && choice !== "oppose")) {
-      return reply({ ok: false, error: "item_type, item_id and choice (support or oppose) are required." }, 400);
+      return send({ ok: false, error: "item_type, item_id and choice (support or oppose) are required." }, 400);
     }
 
     const { count } = await db
       .from(ITEM_TABLES[item_type])
       .select("id", { count: "exact", head: true })
       .eq("id", item_id as string);
-    if (!count) return reply({ ok: false, error: "That item does not exist." }, 404);
+    if (!count) return send({ ok: false, error: "That item does not exist." }, 404);
 
     const { error } = await db
       .from("tx_community_votes")
@@ -142,13 +174,13 @@ Deno.serve(async (req) => {
     const state = (await describe([{ type: item_type, id: item_id as string }], hash))[`${item_type}:${item_id}`];
     if (error) {
       if (error.code === "23505") {
-        return reply({ ok: false, reason: "already_voted", message: "You've already voted on this.", ...state }, 409);
+        return send({ ok: false, reason: "already_voted", message: "You've already voted on this.", ...state }, 409);
       }
       throw error;
     }
-    return reply({ ok: true, ...state });
+    return send({ ok: true, ...state });
   } catch (error) {
     console.error(error);
-    return reply({ ok: false, error: "Something went wrong. Try again in a moment." }, 500);
+    return send({ ok: false, error: "Something went wrong. Try again in a moment." }, 500);
   }
 });

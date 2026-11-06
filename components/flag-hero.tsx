@@ -6,6 +6,7 @@ import { StarMark } from "@/components/star-mark";
 import type { DeliveredSummary } from "@/lib/delivered";
 import { termEndYear } from "@/lib/delivered";
 import { formatLongDate, hostname, officeLabel } from "@/lib/format";
+import { termClock } from "@/lib/term";
 import type { Politician } from "@/lib/types";
 
 function initials(name: string) {
@@ -29,6 +30,9 @@ export function FlagHero({
 }) {
   const startYear = politician.term_start?.slice(0, 4);
   const endYear = termEndYear(politician);
+  // Go by the term clock, not the hand-set status, so the label drops on inauguration day.
+  const notSworn =
+    politician.status === "elect" && termClock(politician.term_start, new Date(asOf)).phase !== "in_office";
   const term = startYear && endYear ? `Term ${startYear} – ${endYear}` : null;
 
   const officeChannels: ContactChannel[] = politician.official_site_url
@@ -115,7 +119,7 @@ export function FlagHero({
               {politician.name}
             </h1>
             <p className="text-muted-foreground">
-              {[politician.party, term, politician.status === "elect" ? "Elected, not yet sworn in" : null]
+              {[politician.party, term, notSworn ? "Elected, not yet sworn in" : null]
                 .filter(Boolean)
                 .join(" · ")}
             </p>

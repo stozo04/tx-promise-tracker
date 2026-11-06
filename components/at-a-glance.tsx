@@ -6,7 +6,28 @@ import { formatLongDate } from "@/lib/format";
 
 const VISIBLE_ROWS = 8;
 
-function squareLabel(action: DeliveredAction, kind: "Matched" | "Went against") {
+type SquareKind = "Matched" | "Went against" | "Partly matched" | "Replaced by a newer promise";
+
+const SQUARE_CLASS: Record<SquareKind, string> = {
+  "Went against": "bg-[var(--against-fg)]",
+  Matched: "bg-[var(--match-fg)]",
+  "Partly matched": "bg-[var(--partly-fg)]",
+  "Replaced by a newer promise": "border-2 border-foreground/60 bg-transparent",
+};
+
+function Square({ action, kind }: { action: DeliveredAction; kind: SquareKind }) {
+  const label = squareLabel(action, kind);
+  return (
+    <a
+      href={`#action-${action.id}`}
+      aria-label={label}
+      title={label}
+      className={`block size-7 rounded-[5px] ${SQUARE_CLASS[kind]}`}
+    />
+  );
+}
+
+function squareLabel(action: DeliveredAction, kind: SquareKind) {
   const what = action.note ?? "Evidence on record";
   return `${kind}: ${what}, ${formatLongDate(action.decidedAt)}. Click to see the proof.`;
 }
@@ -14,6 +35,8 @@ function squareLabel(action: DeliveredAction, kind: "Matched" | "Went against") 
 function Row({ pledge }: { pledge: DeliveredPromise }) {
   const against = pledge.actions.filter((action) => action.direction === "against");
   const match = pledge.actions.filter((action) => action.direction === "match");
+  const partly = pledge.actions.filter((action) => action.direction === "partly");
+  const replaced = pledge.actions.filter((action) => action.direction === "neutral");
   const quiet = pledge.actions.length === 0;
 
   return (
@@ -26,25 +49,19 @@ function Row({ pledge }: { pledge: DeliveredPromise }) {
       </Link>
       <span className="flex flex-wrap justify-end gap-1">
         {against.map((action) => (
-          <a
-            key={action.id}
-            href={`#action-${action.id}`}
-            aria-label={squareLabel(action, "Went against")}
-            title={squareLabel(action, "Went against")}
-            className="block size-7 rounded-[5px] bg-[var(--against-fg)]"
-          />
+          <Square key={action.id} action={action} kind="Went against" />
         ))}
       </span>
       <span aria-hidden="true" className="self-stretch bg-foreground/50" />
       <span className="flex flex-wrap items-center gap-1">
         {match.map((action) => (
-          <a
-            key={action.id}
-            href={`#action-${action.id}`}
-            aria-label={squareLabel(action, "Matched")}
-            title={squareLabel(action, "Matched")}
-            className="block size-7 rounded-[5px] bg-[var(--match-fg)]"
-          />
+          <Square key={action.id} action={action} kind="Matched" />
+        ))}
+        {partly.map((action) => (
+          <Square key={action.id} action={action} kind="Partly matched" />
+        ))}
+        {replaced.map((action) => (
+          <Square key={action.id} action={action} kind="Replaced by a newer promise" />
         ))}
         {quiet ? <span className="text-sm italic text-muted-foreground">No action yet</span> : null}
       </span>

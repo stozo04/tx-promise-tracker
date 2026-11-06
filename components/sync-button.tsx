@@ -7,6 +7,14 @@ import { functionUrl } from "@/lib/community";
 import { cooldownRemaining, formatAgo, formatWait } from "@/lib/sync";
 import { cn } from "@/lib/utils";
 
+const SYNCED_AT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Chicago",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 /**
  * Ask the server for a fresh pull from every source. The whole site gets one
  * sync per 24 hours. Inside that window the button explains how long to wait.
@@ -44,11 +52,14 @@ export function SyncButton({ lastSyncedAt }: { lastSyncedAt: string | null }) {
   const remaining = now === null ? 0 : cooldownRemaining(last, now);
   const status =
     message ??
-    (last && now !== null
-      ? remaining > 0
-        ? `Last synced ${formatAgo(last, now)}. Next sync in ${formatWait(remaining)}.`
-        : `Last synced ${formatAgo(last, now)}.`
-      : "Not synced yet.");
+    (!last
+      ? "Not synced yet."
+      : now === null
+        ? // Before the clock starts (server render, no JS), show the fixed time instead of "never".
+          `Last synced ${SYNCED_AT.format(new Date(last))} CT.`
+        : remaining > 0
+          ? `Last synced ${formatAgo(last, now)}. Next sync in ${formatWait(remaining)}.`
+          : `Last synced ${formatAgo(last, now)}.`);
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3 text-right">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
@@ -28,6 +28,21 @@ export function SaidDid({
   role: string;
 }) {
   const [year, setYear] = useState("all");
+
+  // The at-a-glance squares link to #action-{id}. If a year filter is hiding that action,
+  // clear the filter and then scroll to it, so the proof link never goes nowhere.
+  useEffect(() => {
+    function onClick(event: MouseEvent) {
+      const link = (event.target as Element | null)?.closest?.('a[href^="#action-"]');
+      if (!link) return;
+      const id = link.getAttribute("href")!.slice(1);
+      if (document.getElementById(id)) return;
+      setYear("all");
+      window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: "center" }), 0);
+    }
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
   const selectId = useId();
 
   const shown = promises
