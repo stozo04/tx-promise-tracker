@@ -115,6 +115,7 @@ export function PromiseExplorer({
           <Dropdown
             id="status-filter"
             label="Status"
+            sort={false}
             labelClassName="font-medium"
             value={status}
             onChange={(next) => replace({ status: next })}

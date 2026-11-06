@@ -23,12 +23,13 @@ export function titleCase(text: string) {
 }
 
 /** "All …" stays first; everything else A to Z (numbers in numeric order). */
-function arrange(options: DropdownOption[]) {
+function arrange(options: DropdownOption[], sort: boolean) {
   const shaped = options.map((option) => ({ ...option, label: titleCase(option.label) }));
   const pinned = shaped.filter((option) => option.value === "all");
-  const rest = shaped
-    .filter((option) => option.value !== "all")
-    .sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true, sensitivity: "base" }));
+  const others = shaped.filter((option) => option.value !== "all");
+  const rest = sort
+    ? others.sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true, sensitivity: "base" }))
+    : others;
   return [...pinned, ...rest];
 }
 
@@ -46,6 +47,7 @@ export function Dropdown({
   className,
   labelClassName,
   inline = false,
+  sort = true,
 }: {
   id: string;
   label: string;
@@ -56,9 +58,11 @@ export function Dropdown({
   labelClassName?: string;
   /** Label beside the button instead of above it. */
   inline?: boolean;
+  /** Sort options A to Z (the default). Pass false to keep the given order, e.g. the status lifecycle. */
+  sort?: boolean;
 }) {
   const labelId = `${id}-label`;
-  const items = arrange(options);
+  const items = arrange(options, sort);
   return (
     <div className={cn(inline ? "flex items-center gap-2.5" : "flex flex-col gap-1", className)}>
       <span id={labelId} className={cn("text-sm font-bold", labelClassName)}>
