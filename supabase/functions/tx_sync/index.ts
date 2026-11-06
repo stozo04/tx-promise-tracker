@@ -73,6 +73,10 @@ async function upsert(table: string, rows: Record<string, unknown>[], conflict: 
   return rows.length;
 }
 
+// Values donors put in the employer box that are not an employer.
+const NOT_AN_EMPLOYER =
+  /^(NOT[ -]?EMPLOYED|UNEMPLOYED|NONE|NULL|N\/?A|SELF[ -]?EMPLOYED|SELF|RETIRED|HOMEMAKER|STUDENT|INFORMATION REQUESTED.*|REQUESTED|-+)$/i;
+
 // --- FEC: totals, where the money came from, and the largest itemized gifts.
 async function fec(p: Politician, log: Log) {
   if (!DATA_GOV_KEY) throw new Error("The api.data.gov key is not set (TX_DATA_GOV_API_KEY or tx_private_settings.data_gov_api_key).");
@@ -95,7 +99,11 @@ async function fec(p: Politician, log: Log) {
     const byState = (await getJson(`${base}/schedules/schedule_a/by_state/?committee_id=${committeeId}&cycle=${cycle}&per_page=100&${key}`)).results ?? [];
     stateTotal = byState.reduce((sum: number, row: { total: number }) => sum + row.total, 0);
     inState = byState.filter((row: { state: string }) => row.state === "TX").reduce((sum: number, row: { total: number }) => sum + row.total, 0);
-    employers = ((await getJson(`${base}/schedules/schedule_a/by_employer/?committee_id=${committeeId}&cycle=${cycle}&sort=-total&per_page=10&${key}`)).results ?? [])
+    // Fetch extra rows, then drop answers that are not an employer ("NOT EMPLOYED", "NONE", "NULL"...)
+    // so the list shows the ten largest real employers.
+    employers = ((await getJson(`${base}/schedules/schedule_a/by_employer/?committee_id=${committeeId}&cycle=${cycle}&sort=-total&per_page=50&${key}`)).results ?? [])
+      .filter((row: { employer: string | null }) => row.employer && !NOT_AN_EMPLOYER.test(row.employer.trim()))
+      .slice(0, 10)
       .map((row: { employer: string; total: number }) => ({ employer: row.employer, total: row.total }));
   }
 
