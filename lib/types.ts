@@ -27,6 +27,9 @@ export type Politician = {
   campaign_site_url: string | null;
   archive_url: string | null;
   official_site_url: string | null;
+  portrait_url?: string | null;
+  portrait_credit?: string | null;
+  portrait_source_url?: string | null;
   status: string;
   created_at: string;
   updated_at: string;

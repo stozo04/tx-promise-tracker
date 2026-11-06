@@ -130,6 +130,8 @@ Everything for this project is prefixed `tx_`.
 - `supabase/functions/tx_sync`: `POST` starts a sync, or answers `429` with how long to wait.
 - `tx_tracker.tx_private_settings` holds the IP hash salt and the api.data.gov key (Congress.gov and FEC). Only `service_role` can read it. An Edge Function secret named `TX_DATA_GOV_API_KEY` takes precedence if you set one.
 
+Portraits: upload the image to the `tx-campaign-archives` storage bucket (for example `james-talarico/portrait.jpg`), then set `portrait_url`, `portrait_credit` and `portrait_source_url` on the politician. The portrait shows only when both a URL and a credit are set, and only images from that bucket load.
+
 Both functions are deployed with JWT verification off because they are public by design and check their own input.
 
 ## Deploy on Vercel

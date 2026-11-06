@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import { ContactSection, type ContactChannel } from "@/components/contact-section";
 import { OathCountdown } from "@/components/oath-countdown";
 import { StarMark } from "@/components/star-mark";
@@ -69,17 +71,41 @@ export function FlagHero({
 
       <div className="relative flex flex-wrap items-center gap-7 p-5 sm:p-8">
         <figure className="mx-auto flex w-56 shrink-0 flex-col gap-2 rounded-2xl bg-card p-2.5 shadow-lg sm:mx-0">
-          <div
-            role="img"
-            aria-label={`No official portrait of ${politician.name} is stored yet`}
-            className="flex h-64 flex-col items-center justify-center gap-2 rounded-xl bg-secondary text-muted-foreground"
-          >
-            <span className="font-heading text-6xl font-semibold text-ink">{initials(politician.name)}</span>
-            <span className="text-xs font-semibold">Official portrait</span>
-          </div>
-          <figcaption className="px-1.5 pb-1 text-xs text-muted-foreground">
-            Shown once there is an official photo with a source.
-          </figcaption>
+          {politician.portrait_url && politician.portrait_credit ? (
+            <>
+              <Image
+                src={politician.portrait_url}
+                alt={`Portrait of ${politician.name}`}
+                width={440}
+                height={528}
+                priority
+                className="h-64 w-full rounded-xl object-cover object-top"
+              />
+              <figcaption className="px-1.5 pb-1 text-xs text-muted-foreground">
+                {politician.portrait_source_url ? (
+                  <a href={politician.portrait_source_url} className="underline underline-offset-2">
+                    {politician.portrait_credit}
+                  </a>
+                ) : (
+                  politician.portrait_credit
+                )}
+              </figcaption>
+            </>
+          ) : (
+            <>
+              <div
+                role="img"
+                aria-label={`No official portrait of ${politician.name} is stored yet`}
+                className="flex h-64 flex-col items-center justify-center gap-2 rounded-xl bg-secondary text-muted-foreground"
+              >
+                <span className="font-heading text-6xl font-semibold text-ink">{initials(politician.name)}</span>
+                <span className="text-xs font-semibold">Official portrait</span>
+              </div>
+              <figcaption className="px-1.5 pb-1 text-xs text-muted-foreground">
+                Shown once there is an official photo with a source.
+              </figcaption>
+            </>
+          )}
         </figure>
 
         <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-5 rounded-2xl bg-card p-5 shadow-lg sm:p-7">
