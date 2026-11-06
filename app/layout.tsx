@@ -51,6 +51,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <SiteHeader politicians={ledger.politicians.map((politician) => ({
             name: politician.name,
             slug: politician.slug,
+            office: politician.office,
           }))} />
           <main id="main" className="flex-1">
             {children}

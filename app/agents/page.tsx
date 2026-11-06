@@ -5,7 +5,7 @@ import { GITHUB_REPO_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "For agents",
-  description: "How an AI agent should read the Texas Promise Tracker API without inventing records.",
+  description: "How an AI agent should read the Promise vs. Delivered API without inventing records.",
 };
 
 const ENDPOINTS = [

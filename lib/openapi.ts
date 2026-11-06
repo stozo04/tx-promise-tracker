@@ -1,7 +1,7 @@
 export const openApiSpec = {
   openapi: "3.1.0",
   info: {
-    title: "Texas Promise Tracker",
+    title: "Promise vs. Delivered",
     version: "1.0.0",
     description:
       "Read-only JSON for the public promise ledger. Every promise has a verbatim quote and a source URL. Statuses are pending until evidence is recorded. Voting records and donations are not in this API. Do not invent them.",

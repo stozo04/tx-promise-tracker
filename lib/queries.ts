@@ -112,3 +112,35 @@ export async function loadLedger(): Promise<Ledger> {
 export function politicianBySlug(ledger: Ledger, slug: string) {
   return ledger.politicians.find((politician) => politician.slug === slug.toLowerCase());
 }
+
+/**
+ * The newest ingest run, read fresh rather than from the ledger cache.
+ * The sync cooldown depends on it, so it must not be minutes out of date.
+ */
+export async function latestIngestRun(): Promise<{ started_at: string; finished_at: string | null } | null> {
+  const { url, key } = getSupabaseEnv();
+  const client = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const db = (client as unknown as {
+    schema: (name: string) => {
+      from: (table: string) => {
+        select: (columns: string) => {
+          order: (column: string, options: { ascending: boolean }) => {
+            limit: (count: number) => PromiseLike<{
+              data: { started_at: string; finished_at: string | null }[] | null;
+              error: { message: string } | null;
+            }>;
+          };
+        };
+      };
+    };
+  }).schema("tx_tracker");
+  const { data, error } = await db
+    .from("ingest_runs")
+    .select("started_at, finished_at")
+    .order("started_at", { ascending: false })
+    .limit(1);
+  if (error) throw new Error(`Could not read tx_tracker.ingest_runs: ${error.message}`);
+  return data?.[0] ?? null;
+}

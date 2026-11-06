@@ -1,4 +1,4 @@
-# Texas Promise Tracker
+# Promise vs. Delivered (Texas Promise Tracker)
 
 An independent public ledger of what James Talarico and Gina Hinojosa promised, so people can check later whether they delivered.
 
@@ -43,7 +43,8 @@ GitHub Actions copies `.env.example` to `.env.local` before lint, typecheck, and
 
 - `/` scoreboard, days until the oath, and coming-soon cards
 - A header theme button. It follows the system setting until you pick light or dark, then remembers that choice in this browser.
-- `/politicians/james-talarico` and `/politicians/gina-hinojosa`
+- `/politicians/james-talarico` and `/politicians/gina-hinojosa`: Promise vs. Delivered. The flag panel, an at-a-glance chart of each explicit pledge, and Said / Did cards that pair each promise with the evidence filed against it
+- `/politicians/[slug]/nerds`: upcoming events, votes, campaign money, the archived campaign site, data sources, and the Sync button
 - `/promises/[id]` quote, source, archive, and status timeline
 - `/archives` screenshots
 - `/how-we-track` methodology
@@ -61,8 +62,11 @@ Read only.
 - `GET /api/promises/{id}`
 - `GET /api/sources`
 - `GET /api/openapi.json`
+- `GET /api/sync` and `POST /api/sync`: the site-wide sync cooldown. One sync per 24 hours. Inside the window `POST` answers `429` with `retry_after_seconds`. Outside it, `POST` answers `503` until the ingest pipeline is connected.
 
 `type` is `explicit_pledge` or `platform`. `status` is `pending`, `in_progress`, `kept`, `partial`, `broken`, `superseded`, or `unverified`.
+
+Each status update is shown as one action under its promise. Its direction comes from the status it set: `kept` and `in_progress` match the promise, `broken` goes against it, `partial` partly matches, and `superseded` is neutral. One promise can collect actions that point both ways over time.
 
 Voting records and donations are not in the API. The field `not_yet_tracked` says so. Do not invent them.
 
