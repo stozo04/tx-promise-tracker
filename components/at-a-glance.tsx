@@ -63,9 +63,6 @@ export function AtAGlance({ pledges, launchNote }: { pledges: DeliveredPromise[]
         <h2 id="at-a-glance" className="text-2xl text-ink sm:text-3xl">
           Promise vs. action, at a glance
         </h2>
-        <p className="text-sm text-muted-foreground">
-          Each square is one cited action. Click a pledge or a square to see the proof.
-        </p>
       </div>
       {launchNote ? (
         <p className="rounded-2xl bg-secondary px-4 py-3 text-sm leading-6">{launchNote}</p>
