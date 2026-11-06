@@ -8,7 +8,6 @@ import { SegmentedRing } from "@/components/segmented-ring";
 import { StarMark } from "@/components/star-mark";
 import { StatusBar, StatusTally } from "@/components/status-tally";
 import { StatusPill } from "@/components/status-pill";
-import { VoteLine } from "@/components/vote-line";
 import { screenshotCards } from "@/lib/archives";
 import {
   formatTimestamp,
@@ -141,7 +140,6 @@ export default async function HomePage() {
                   <SegmentedRing counts={personCounts} label={ringLabel} />
                   <StatusTally counts={personCounts} />
                 </div>
-                <VoteLine slug={politician.slug} />
                 <Link
                   href={`/politicians/${politician.slug}`}
                   className="inline-block text-sm font-semibold text-bluebonnet underline"

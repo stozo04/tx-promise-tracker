@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ShowMore } from "@/components/show-more";
 import type { DeliveredAction, DeliveredPromise } from "@/lib/delivered";
 import { formatLongDate } from "@/lib/format";
 
@@ -78,24 +79,22 @@ export function AtAGlance({ pledges, launchNote }: { pledges: DeliveredPromise[]
         <span />
         <span className="text-[var(--match-fg)]">Matched it</span>
       </div>
-      <ul className="flex flex-col gap-2">
-        {first.map((pledge) => (
-          <Row key={pledge.id} pledge={pledge} />
-        ))}
-      </ul>
-      {rest.length > 0 ? (
-        <details className="group">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-xl border-2 border-border px-4 text-sm font-bold">
-            <span className="group-open:hidden">Show all {pledges.length} pledges</span>
-            <span className="hidden group-open:inline">Show fewer</span>
-          </summary>
-          <ul className="mt-2 flex flex-col gap-2">
-            {rest.map((pledge) => (
-              <Row key={pledge.id} pledge={pledge} />
-            ))}
-          </ul>
-        </details>
-      ) : null}
+      <div className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2">
+          {first.map((pledge) => (
+            <Row key={pledge.id} pledge={pledge} />
+          ))}
+        </ul>
+        {rest.length > 0 ? (
+          <ShowMore total={pledges.length}>
+            <ul className="flex flex-col gap-2">
+              {rest.map((pledge) => (
+                <Row key={pledge.id} pledge={pledge} />
+              ))}
+            </ul>
+          </ShowMore>
+        ) : null}
+      </div>
     </section>
   );
 }
