@@ -6,6 +6,7 @@ import { ExternalLink } from "lucide-react";
 
 import { CommunityVote } from "@/components/community-vote";
 import { DirectionChip } from "@/components/direction-chip";
+import { Dropdown } from "@/components/dropdown";
 import { StatusPill } from "@/components/status-pill";
 import type { DeliveredPromise } from "@/lib/delivered";
 import { formatLongDate, topicLabel } from "@/lib/format";
@@ -50,24 +51,14 @@ export function SaidDid({
           </p>
         </div>
         {years.length > 0 ? (
-          <div className="flex items-center gap-2.5">
-            <label htmlFor={selectId} className="text-sm font-bold">
-              Year
-            </label>
-            <select
-              id={selectId}
-              value={year}
-              onChange={(event) => setYear(event.target.value)}
-              className="min-h-11 rounded-xl border-2 border-foreground bg-card px-3 text-sm font-bold"
-            >
-              <option value="all">All years</option>
-              {years.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Dropdown
+            id={selectId}
+            label="Year"
+            inline
+            value={year}
+            onChange={setYear}
+            options={[{ value: "all", label: "All years" }, ...years.map((value) => ({ value, label: value }))]}
+          />
         ) : null}
       </div>
 

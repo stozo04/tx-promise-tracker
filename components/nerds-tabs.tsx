@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ExternalLink, RefreshCw } from "lucide-react";
 
 import { CommunityVote } from "@/components/community-vote";
+import { Dropdown } from "@/components/dropdown";
 import { SyncButton } from "@/components/sync-button";
 import { actionLabel, officialStance, stanceText } from "@/lib/community";
 import type { DataSource } from "@/lib/data-sources";
@@ -122,24 +123,14 @@ export function NerdsTabs({
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {showYear && years.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <label htmlFor={yearId} className="text-sm font-bold">
-                Year
-              </label>
-              <select
-                id={yearId}
-                value={year}
-                onChange={(event) => setYear(event.target.value)}
-                className="min-h-11 rounded-xl border-2 border-foreground bg-card px-3 text-sm font-bold"
-              >
-                <option value="all">All years</option>
-                {years.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Dropdown
+              id={yearId}
+              label="Year"
+              inline
+              value={year}
+              onChange={setYear}
+              options={[{ value: "all", label: "All years" }, ...years.map((value) => ({ value, label: value }))]}
+            />
           ) : null}
           <SyncButton lastSyncedAt={lastSyncedAt} />
         </div>
