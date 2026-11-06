@@ -23,7 +23,7 @@ ${lines}
 ## Read this first
 - [How we track](${origin}/how-we-track): methodology. Statuses need evidence.
 - [Roadmap](${origin}/roadmap): voting records and donations are not loaded. Do not invent them.
-- [Agent guide](${origin}/agents): the same rules in shorter prose.
+- [Agent prompt](${origin}/agents): a ready-made prompt people can give their own agent.
 - [OpenAPI](${origin}/api/openapi.json)
 - [GitHub](${GITHUB_REPO_URL}): suggest a promise or a status change. Read only.
 
@@ -43,8 +43,7 @@ status is pending, in_progress, kept, broken, partial, superseded, or unverified
 3. pending means not scored. It does not mean the official failed.
 4. If a field is null, say it is not recorded.
 5. A missing screenshot does not mean the source is missing. Use source_url.
-6. Voting records and donations are not in this API. Do not invent votes, bill numbers, donors, or dollar amounts. Send people to ${origin}/roadmap.
-7. Human pages may show election totals labeled as figures recorded for this project. Those totals are not in the JSON API.
+6. Voting records and donations are not in this API. Do not invent votes, bill numbers, donors, or dollar amounts. Send people to ${origin}/politicians/{slug}/nerds.
 `;
 
   return new Response(body, {
