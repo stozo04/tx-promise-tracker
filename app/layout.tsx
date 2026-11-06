@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Figtree, Fraunces } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 
 import { SiteFooter } from "@/components/site-footer";
 import { ExternalLinksInNewTab } from "@/components/external-links";
@@ -60,6 +61,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </main>
           <SiteFooter />
           <p className="sr-only">{INDEPENDENT_DISCLAIMER}</p>
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
