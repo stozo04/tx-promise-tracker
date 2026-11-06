@@ -20,6 +20,25 @@ function locate(pathname: string, people: Person[]) {
   return { slug, section };
 }
 
+/** The site name. Takes you to the Promise vs. Delivered page for whoever you are looking at. */
+export function BrandLink({
+  people,
+  className,
+  children,
+}: {
+  people: Person[];
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname() ?? "/";
+  const slug = locate(pathname, people).slug ?? people[0]?.slug;
+  return (
+    <Link href={slug ? `/politicians/${slug}` : "/"} className={className}>
+      {children}
+    </Link>
+  );
+}
+
 /** Section links plus the Governor / Senator switch. The switch keeps you on the same section. */
 export function SiteNav({ people }: { people: Person[] }) {
   const pathname = usePathname() ?? "/";
@@ -28,7 +47,6 @@ export function SiteNav({ people }: { people: Person[] }) {
   const onAgents = pathname.startsWith("/agents");
 
   const links = [
-    { href: `/politicians/${current}`, label: "Promise vs. Delivered", active: section === "delivered" },
     { href: `/politicians/${current}/nerds`, label: "For the nerds", active: section === "nerds" },
     { href: "/agents", label: "For your agent", active: onAgents },
   ];

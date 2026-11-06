@@ -51,7 +51,7 @@ export function SyncButton({ lastSyncedAt }: { lastSyncedAt: string | null }) {
       : "Not synced yet.");
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center justify-end gap-3 text-right">
       <p aria-live="polite" className="text-sm text-muted-foreground">
         {status}
       </p>

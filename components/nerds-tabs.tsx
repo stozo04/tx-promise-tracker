@@ -132,7 +132,6 @@ export function NerdsTabs({
               options={[{ value: "all", label: "All years" }, ...years.map((value) => ({ value, label: value }))]}
             />
           ) : null}
-          <SyncButton lastSyncedAt={lastSyncedAt} />
         </div>
       </div>
 
@@ -418,6 +417,10 @@ export function NerdsTabs({
           </ul>
         </div>
       ) : null}
+
+      <div className="flex justify-end border-t border-border pt-4">
+        <SyncButton lastSyncedAt={lastSyncedAt} />
+      </div>
     </div>
   );
 }

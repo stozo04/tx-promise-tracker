@@ -1,6 +1,4 @@
-import Link from "next/link";
-
-import { SiteNav } from "@/components/site-nav";
+import { BrandLink, SiteNav } from "@/components/site-nav";
 import { StarMark } from "@/components/star-mark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { GITHUB_REPO_URL, SITE_NAME } from "@/lib/site";
@@ -21,13 +19,13 @@ export function SiteHeader({
   return (
     <header className="sticky top-0 z-30 border-b border-border/80 bg-paper/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3">
-        <Link href="/" className="mr-auto flex items-center gap-2 text-ink sm:mr-0">
+        <BrandLink people={politicians} className="mr-auto flex items-center gap-2 text-ink sm:mr-0">
           <StarMark className="size-7 text-bluebonnet" />
           <span className="leading-tight">
             <span className="block font-heading text-lg font-semibold">{SITE_NAME}</span>
             <span className="block text-xs text-muted-foreground">Texas · a public receipt book</span>
           </span>
-        </Link>
+        </BrandLink>
         <SiteNav people={politicians} />
         <ThemeToggle />
         <a
