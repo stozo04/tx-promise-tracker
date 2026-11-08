@@ -14,7 +14,7 @@ function GitHubMark({ className }: { className?: string }) {
 export function SiteHeader({
   politicians,
 }: {
-  politicians: { name: string; slug: string; office: string }[];
+  politicians: { name: string; slug: string; office: string; district: string | null }[];
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border/80 bg-paper/90 backdrop-blur-md">

@@ -3,16 +3,27 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 
+import { officeTitle } from "@/lib/offices";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 
+export type PromptPerson = { name: string; slug: string; office: string; district: string | null };
+
+function joinList(items: string[]) {
+  if (items.length <= 1) return items.join("");
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
 /** The prompt a person pastes into their own AI agent so it can answer questions from this site. */
-export function agentPrompt(origin: string) {
-  return `You are helping me follow ${SITE_NAME} (${origin}), an independent public website that tracks the campaign promises of Texas's newly elected officials: Senator-elect James Talarico (U.S. Senate) and Governor-elect Gina Hinojosa. It is not a campaign, party, or government site. Every promise on it is a verbatim quote tied to a primary source, and every status change needs cited evidence.
+export function agentPrompt(origin: string, people: PromptPerson[]) {
+  const who = joinList(people.map((person) => `${person.name} (${officeTitle(person)})`));
+  const slugs = people.map((person) => person.slug).join(", ");
+  return `You are helping me follow ${SITE_NAME} (${origin}), an independent public website that tracks the campaign promises of Texas's newly elected officials: ${who}. It is not a campaign, party, or government site. Every promise on it is a verbatim quote tied to a primary source, and every status change needs cited evidence.
 
 Use the site's read-only JSON API to answer my questions. Never guess and never fill gaps from memory.
 
 HOW TO READ IT
-1. GET ${origin}/api/politicians lists the people. Each has a slug (james-talarico, gina-hinojosa), office, election date and term start.
+1. GET ${origin}/api/politicians lists the people. Each has a slug (${slugs}), office, district (for Texas House seats), election date and term start.
 2. GET ${origin}/api/politicians/{slug}/summary gives counts by status, type and topic, plus days until the term starts or days in office.
 3. GET ${origin}/api/promises lists promises. Filters: politician (slug), topic, status, type, q (text search), source. Paging: limit (up to 500) and offset. Each promise has summary_text, verbatim_quote, source_url, archive_url, date_said, topic, promise_type, status and updated_at.
 4. GET ${origin}/api/promises/{id} gives one promise with its source, archived copies, and status_updates: the timeline of status changes, each with status, evidence_url, evidence_note and decided_at.
@@ -42,10 +53,10 @@ RULES
 Start by fetching ${origin}/api/politicians and telling me who is tracked and how many promises each has.`;
 }
 
-export function AgentPrompt() {
+export function AgentPrompt({ people }: { people: PromptPerson[] }) {
   const [copied, setCopied] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
-  const prompt = agentPrompt(SITE_URL);
+  const prompt = agentPrompt(SITE_URL, people);
 
   useEffect(() => {
     if (!copied) return;

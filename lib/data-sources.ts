@@ -8,7 +8,7 @@ export type DataSource = {
   linkText: string;
   /** "live" sources feed the ledger today. "planned" sources are on the roadmap and load nothing yet. */
   state: "live" | "planned";
-  /** Limit a planned source to one office. Empty means it applies to both. */
+  /** Limit a source to these offices. Empty means it applies to every office. */
   offices?: string[];
 };
 
@@ -46,13 +46,24 @@ export const DATA_SOURCES: DataSource[] = [
   {
     name: "Texas Legislature Online",
     who: "Texas Legislative Council (state agency)",
-    what: "Bills, their history, and whether the governor signed or vetoed them",
+    what: "Bills, who filed them, their history, and whether the governor signed or vetoed them",
     how: "Official bill records, checked on each sync",
     why: "It is the Legislature's own record of every bill",
     href: "https://capitol.texas.gov",
     linkText: "capitol.texas.gov",
     state: "planned",
-    offices: ["governor"],
+    offices: ["governor", "tx_house"],
+  },
+  {
+    name: "Texas House Journal",
+    who: "Chief Clerk of the Texas House of Representatives",
+    what: "How the representative voted on each record vote",
+    how: "Record votes printed in the official House Journal",
+    why: "The House records each record vote in its own journal",
+    href: "https://house.texas.gov",
+    linkText: "house.texas.gov",
+    state: "planned",
+    offices: ["tx_house"],
   },
   {
     name: "Office of the Governor",
@@ -101,13 +112,13 @@ export const DATA_SOURCES: DataSource[] = [
   {
     name: "Texas Ethics Commission",
     who: "State agency",
-    what: "Who gave to the governor's campaign, and how much",
+    what: "Who gave to the campaign, and how much",
     how: "Official campaign finance reports",
     why: "State law requires these filings",
     href: "https://www.ethics.state.tx.us",
     linkText: "ethics.state.tx.us",
     state: "planned",
-    offices: ["governor"],
+    offices: ["governor", "tx_house"],
   },
 ];
 

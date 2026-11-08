@@ -191,7 +191,9 @@ export function PromiseExplorer({
 
       {result.error ? null : groups.length === 0 ? (
         <p className="rounded-3xl border border-dashed border-border bg-card px-5 py-8 text-center">
-          Nothing matches. Clear a filter, or try a shorter search.
+          {promises.length === 0
+            ? "No promises are on record yet. Each one appears here with a verbatim quote and its source once it is added."
+            : "Nothing matches. Clear a filter, or try a shorter search."}
         </p>
       ) : (
         groups.map(([key, rows]) => (

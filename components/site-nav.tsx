@@ -3,14 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { officeShort, officeTitle } from "@/lib/offices";
 import { cn } from "@/lib/utils";
 
-type Person = { name: string; slug: string; office: string };
-
-const OFFICE_SHORT: Record<string, string> = {
-  governor: "Governor",
-  us_senate: "Senator",
-};
+type Person = { name: string; slug: string; office: string; district: string | null };
 
 /** Which politician a path is about, and which of their pages it is. */
 function locate(pathname: string, people: Person[]) {
@@ -39,7 +35,7 @@ export function BrandLink({
   );
 }
 
-/** Section links plus the Governor / Senator switch. The switch keeps you on the same section. */
+/** Section links plus the official switch (Senator / Governor / District N). The switch keeps you on the same section. */
 export function SiteNav({ people }: { people: Person[] }) {
   const pathname = usePathname() ?? "/";
   const { slug, section } = locate(pathname, people);
@@ -77,13 +73,13 @@ export function SiteNav({ people }: { people: Person[] }) {
               key={person.slug}
               href={href}
               aria-current={on ? "page" : undefined}
-              title={person.name}
+              title={`${person.name}, ${officeTitle(person)}`}
               className={cn(
                 "inline-flex min-h-10 items-center rounded-lg px-3.5 text-sm font-extrabold",
                 on ? "bg-foreground text-background" : "text-foreground hover:bg-card",
               )}
             >
-              {OFFICE_SHORT[person.office] ?? person.name.split(" ")[0]}
+              {officeShort(person)}
             </Link>
           );
         })}

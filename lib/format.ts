@@ -1,3 +1,4 @@
+import { officeTitle } from "@/lib/offices";
 import { PROMISE_TYPES, STATUSES, type PromiseType, type Status } from "@/lib/types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -23,11 +24,6 @@ const STATUS_HELP: Record<string, string> = {
 const TYPE_LABELS: Record<string, string> = {
   explicit_pledge: "Explicit pledge",
   platform: "Platform",
-};
-
-const OFFICE_LABELS: Record<string, string> = {
-  us_senate: "U.S. Senate",
-  governor: "Governor of Texas",
 };
 
 const TOPIC_LABELS: Record<string, string> = {
@@ -72,8 +68,9 @@ export function typeLabel(type: string) {
   return TYPE_LABELS[type] ?? humanize(type);
 }
 
-export function officeLabel(office: string) {
-  return OFFICE_LABELS[office] ?? humanize(office);
+/** The office name, with the district when there is one: "Texas House of Representatives, District 112". */
+export function officeLabel(person: { office: string; district?: string | null }) {
+  return officeTitle(person);
 }
 
 export function topicLabel(topic: string | null) {

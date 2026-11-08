@@ -55,6 +55,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             name: politician.name,
             slug: politician.slug,
             office: politician.office,
+            district: politician.district ?? null,
           }))} />
           <main id="main" className="flex-1">
             {children}

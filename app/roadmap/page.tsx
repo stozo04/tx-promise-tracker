@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ComingSoon } from "@/components/coming-soon";
+import { officeMoneyPlan, officeRecordPlan, officeTitle } from "@/lib/offices";
+import { loadLedger } from "@/lib/queries";
 import { teasersFor } from "@/lib/roadmap";
 import { GITHUB_REPO_URL, INDEPENDENT_DISCLAIMER } from "@/lib/site";
 
@@ -10,7 +12,8 @@ export const metadata: Metadata = {
   description: "What the tracker shows today, what Sync loads automatically, and what is still added by hand.",
 };
 
-export default function RoadmapPage() {
+export default async function RoadmapPage() {
+  const { politicians } = await loadLedger();
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-10 px-4 py-10">
       <header className="space-y-3">
@@ -45,8 +48,11 @@ export default function RoadmapPage() {
           promise only when the vote actually bears on that promise.
         </p>
         <ul className="list-disc space-y-2 pl-5 leading-7">
-          <li>James Talarico, U.S. Senate: Congress.gov and Senate roll calls. Loaded by Sync once his term starts.</li>
-          <li>Gina Hinojosa, Governor of Texas: Texas bill signings and vetoes. Added by hand for now.</li>
+          {politicians.map((politician) => (
+            <li key={politician.slug}>
+              {politician.name}, {officeTitle(politician)}: {officeRecordPlan(politician.office)}
+            </li>
+          ))}
         </ul>
         <p className="leading-7">
           A vote is shown only after it is copied from one of those public records. A missing link to a
@@ -60,8 +66,11 @@ export default function RoadmapPage() {
           The goal is to show who contributed, with the filing that proves the name and the amount.
         </p>
         <ul className="list-disc space-y-2 pl-5 leading-7">
-          <li>James Talarico: FEC filings. Loaded by Sync.</li>
-          <li>Gina Hinojosa: Texas Ethics Commission reports. Not automated yet.</li>
+          {politicians.map((politician) => (
+            <li key={politician.slug}>
+              {politician.name}: {officeMoneyPlan(politician.office)}
+            </li>
+          ))}
         </ul>
         <p className="leading-7">
           A contributor is named only when that filing is linked. Amounts come from the filing, not from
@@ -72,7 +81,7 @@ export default function RoadmapPage() {
       <section className="space-y-2">
         <h2 className="text-2xl">Help build it</h2>
         <p className="leading-7">
-          Automating the governor&apos;s records and the Texas Ethics Commission reports has not started. The
+          Automating the governor&apos;s records, Texas House record votes, and the Texas Ethics Commission reports has not started. The
           GitHub repo has issue templates for a voting-record plan and a donations plan, plus templates for a new promise and a status change. Do not attach invented
           rows to make a demo.
         </p>

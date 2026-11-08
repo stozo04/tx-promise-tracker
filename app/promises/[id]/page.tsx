@@ -84,7 +84,7 @@ export default async function PromisePage({ params }: Props) {
         </div>
         {politician ? (
           <p className="text-sm text-muted-foreground">
-            {politician.name} · {officeLabel(politician.office)}
+            {politician.name} · {officeLabel(politician)}
           </p>
         ) : null}
         {same ? (
