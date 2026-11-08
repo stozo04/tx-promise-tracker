@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { LedgerLoading } from "@/components/ledger-loading";
 import { NerdsTabs } from "@/components/nerds-tabs";
 import { screenshotCards } from "@/lib/archives";
 import { dataSourcesFor } from "@/lib/data-sources";
@@ -34,14 +35,6 @@ export default function NerdsPage({ params }: Props) {
     <Suspense fallback={<LedgerLoading />}>
       <NerdsRecord params={params} />
     </Suspense>
-  );
-}
-
-function LedgerLoading() {
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-16">
-      <p role="status">Opening the ledger…</p>
-    </div>
   );
 }
 

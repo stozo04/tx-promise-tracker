@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { LedgerLoading } from "@/components/ledger-loading";
 import { AtAGlance } from "@/components/at-a-glance";
 import { FlagHero } from "@/components/flag-hero";
 import { PromiseExplorer } from "@/components/promise-explorer";
@@ -39,14 +40,6 @@ export default function PoliticianPage({ params }: Props) {
     <Suspense fallback={<LedgerLoading />}>
       <PoliticianRecord params={params} />
     </Suspense>
-  );
-}
-
-function LedgerLoading() {
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-16">
-      <p role="status">Opening the ledger…</p>
-    </div>
   );
 }
 

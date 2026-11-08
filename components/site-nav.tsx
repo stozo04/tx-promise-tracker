@@ -39,11 +39,16 @@ export function BrandLink({
 export function SiteNav({ people }: { people: Person[] }) {
   const pathname = usePathname() ?? "/";
   const { slug, section } = locate(pathname, people);
-  const current = slug ?? people[0]?.slug;
+  // While the header is still loading the list of officials, fall back to the slug in the URL.
+  const current = slug ?? people[0]?.slug ?? pathname.match(/^\/politicians\/([^/]+)/)?.[1];
   const onAgents = pathname.startsWith("/agents");
 
   const links = [
-    { href: `/politicians/${current}/nerds`, label: "For the nerds", active: section === "nerds" },
+    {
+      href: current ? `/politicians/${current}/nerds` : "/",
+      label: "For the nerds",
+      active: section === "nerds" || (!slug && /\/nerds\/?$/.test(pathname)),
+    },
     { href: "/agents", label: "For your agent", active: onAgents },
   ];
 
@@ -64,7 +69,12 @@ export function SiteNav({ people }: { people: Person[] }) {
           </Link>
         ))}
       </nav>
-      <div role="group" aria-label="Choose official" className="flex shrink-0 gap-1 rounded-xl bg-secondary p-1">
+      <div
+        role="group"
+        aria-label="Choose official"
+        aria-busy={people.length === 0 || undefined}
+        className={cn("flex shrink-0 gap-1 rounded-xl bg-secondary p-1", people.length === 0 && "invisible")}
+      >
         {people.map((person) => {
           const on = person.slug === slug;
           const href = section === "nerds" ? `/politicians/${person.slug}/nerds` : `/politicians/${person.slug}`;
