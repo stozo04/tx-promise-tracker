@@ -1,0 +1,15 @@
+{
+  "captured": "2026-11-08",
+  "origin": "https://act.vikkigoodwin.com",
+  "pages": [
+    "https://act.vikkigoodwin.com/hemp/"
+  ],
+  "crawlErrors": [],
+  "assetFailures": [],
+  "modifications": [
+    "The sign-up form is disabled in this copy (fields and submit button disabled, form action removed) so visitors to the archive cannot submit personal information. No text was changed.",
+    "Scripts are removed, including Google Tag Manager and Google Analytics. The page was saved after the browser rendered it.",
+    "The page was captured with its \"RSVP for Rally\" pop-up open. Without scripts the pop-up cannot be closed, so it is hidden with CSS and the pop-up classes are removed from <body>. The pop-up stays in the HTML.",
+    "The header background video is saved in full (the first capture saved only its first bytes) and shown without the lazy-loading class that needed a script."
+  ]
+}
