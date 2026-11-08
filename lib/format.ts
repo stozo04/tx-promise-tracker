@@ -28,6 +28,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 const TOPIC_LABELS: Record<string, string> = {
   affordability: "Affordability",
+  cannabis_thc: "Cannabis and THC",
   corruption_democracy: "Corruption and democracy",
   data_centers: "Data centers",
   health_care: "Health care",
