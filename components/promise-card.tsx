@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { StatusPill } from "@/components/status-pill";
-import { formatLongDate, hostname, topicLabel, typeLabel } from "@/lib/format";
+import { formatLongDate, hostname, typeLabel } from "@/lib/format";
 import type { PromiseRow } from "@/lib/types";
 
 export function PromiseCard({
@@ -22,7 +22,7 @@ export function PromiseCard({
           {typeLabel(promise.promise_type)}
         </span>
         {promise.topic ? (
-          <span className="text-muted-foreground">{topicLabel(promise.topic)}</span>
+          <span className="text-muted-foreground">{promise.topic_label}</span>
         ) : null}
       </div>
       <h3 className="text-xl leading-snug text-ink">

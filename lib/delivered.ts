@@ -43,6 +43,7 @@ export type DeliveredPromise = {
   summary: string;
   quote: string;
   topic: string | null;
+  topicLabel: string;
   type: string;
   dateSaid: string | null;
   sourceUrl: string;
@@ -71,6 +72,7 @@ function toDelivered(promise: PromiseRow, updates: StatusUpdateRow[]): Delivered
     summary: promise.summary_text,
     quote: promise.verbatim_quote,
     topic: promise.topic,
+    topicLabel: promise.topic_label,
     type: promise.promise_type,
     dateSaid: promise.date_said,
     sourceUrl: promise.source_url,

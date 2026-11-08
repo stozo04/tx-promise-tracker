@@ -73,7 +73,11 @@ export function SiteNav({ people }: { people: Person[] }) {
         role="group"
         aria-label="Choose official"
         aria-busy={people.length === 0 || undefined}
-        className={cn("flex shrink-0 gap-1 rounded-xl bg-secondary p-1", people.length === 0 && "invisible")}
+        // Phones get a two-column grid so four or more officials fit without scrolling the page.
+        className={cn(
+          "grid w-full grid-cols-2 gap-1 rounded-xl bg-secondary p-1 sm:flex sm:w-auto sm:shrink-0",
+          people.length === 0 && "invisible",
+        )}
       >
         {people.map((person) => {
           const on = person.slug === slug;
@@ -85,7 +89,7 @@ export function SiteNav({ people }: { people: Person[] }) {
               aria-current={on ? "page" : undefined}
               title={`${person.name}, ${officeTitle(person)}`}
               className={cn(
-                "inline-flex min-h-10 items-center rounded-lg px-3.5 text-sm font-extrabold",
+                "inline-flex min-h-11 items-center justify-center rounded-lg px-3 text-sm font-extrabold",
                 on ? "bg-foreground text-background" : "text-foreground hover:bg-card",
               )}
             >

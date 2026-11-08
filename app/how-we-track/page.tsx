@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { StatusPill } from "@/components/status-pill";
+import { SyncButton } from "@/components/sync-button";
 import { formatTimestamp, statusHelp } from "@/lib/format";
 import { loadLedger } from "@/lib/queries";
 import { GITHUB_REPO_URL, INDEPENDENT_DISCLAIMER } from "@/lib/site";
+import { syncSummary } from "@/lib/sync";
 import { STATUSES } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -17,6 +19,11 @@ export default async function HowWeTrackPage() {
   const latest = [...ledger.ingestRuns].sort((a, b) =>
     (b.finished_at ?? b.started_at).localeCompare(a.finished_at ?? a.started_at),
   )[0];
+  const lastSyncedAt = ledger.ingestRuns.reduce<string | null>(
+    (newest, run) => (newest === null || run.started_at > newest ? run.started_at : newest),
+    null,
+  );
+  const topics = ledger.topics.filter((topic) => topic.active);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
@@ -124,6 +131,37 @@ export default async function HowWeTrackPage() {
           )}
         </section>
       ) : null}
+
+      <section className="space-y-3">
+        <h2 className="text-2xl">One Sync for every official</h2>
+        <p className="leading-7">
+          Sync covers every official and every topic in one run. For each topic it reads each official&apos;s
+          campaign pages for the topic&apos;s keywords, and it checks the bills the topic watches on Texas Legislature
+          Online and in the House Journal. A keyword match goes into a review queue. It becomes a promise only after a
+          person checks the exact quote and the source.
+        </p>
+        {topics.length > 0 ? (
+          <ul className="flex flex-col gap-2">
+            {topics.map((topic) => (
+              <li key={topic.code} className="rounded-2xl bg-card px-4 py-3 text-sm leading-6">
+                <span className="font-bold">{topic.label}</span>
+                {topic.related_bills.length > 0 ? (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · Watched bills: {topic.related_bills
+                      // Texas Legislature Online's own style: "SB 3 (89(R))", "SB 5 (89(1))" for a called session.
+                      .map((row) => `${row.bill.replace(/^([A-Z]+)/, "$1 ")} (${row.session.slice(0, 2)}(${row.session.slice(2)}))`)
+                      .join(", ")}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="flex justify-end border-t border-border pt-4">
+          <SyncButton lastSyncedAt={lastSyncedAt} summary={syncSummary(ledger)} />
+        </div>
+      </section>
 
       <section className="space-y-2">
         <h2 className="text-2xl">Challenge a record</h2>

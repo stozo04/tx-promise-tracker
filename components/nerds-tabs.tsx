@@ -7,11 +7,12 @@ import { ExternalLink, RefreshCw } from "lucide-react";
 
 import { CommunityVote } from "@/components/community-vote";
 import { Dropdown } from "@/components/dropdown";
-import { SyncButton } from "@/components/sync-button";
+import { ShowMore } from "@/components/show-more";
+import { SyncButton, type SyncSummary } from "@/components/sync-button";
 import { actionLabel, officialStance, stanceText } from "@/lib/community";
 import type { DataSource } from "@/lib/data-sources";
 import { formatLongDate, formatNumber } from "@/lib/format";
-import { isExecutive, officeRole, officeUpcoming } from "@/lib/offices";
+import { earlierRole, officeRecordNote, officeRecordTab, officeRole, officeUpcoming } from "@/lib/offices";
 import type { Teaser } from "@/lib/roadmap";
 import type {
   ArchiveCard,
@@ -47,6 +48,88 @@ function NotLoaded({ teaser, lead }: { teaser?: Teaser; lead: string }) {
   );
 }
 
+function RecordItem({ record, role }: { record: RecordActionRow; role: string }) {
+  return (
+    <li className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="rounded-full border-2 border-foreground px-2.5 py-0.5 font-extrabold">{actionLabel(record)}</span>
+        {record.bill_id ? <span className="font-bold">{record.bill_id}</span> : null}
+        <span className="text-muted-foreground">{formatLongDate(record.acted_on)}</span>
+        {record.result ? <span className="text-muted-foreground">· {record.result}</span> : null}
+      </div>
+      <p className="font-bold leading-snug">{record.title}</p>
+      {record.what_it_does ? <p className="text-sm leading-6">{record.what_it_does}</p> : null}
+      <a href={record.source_url} className="inline-flex items-center gap-1 self-start text-sm font-semibold underline underline-offset-4">
+        {record.source_name}
+        <ExternalLink className="size-3.5" aria-hidden="true" />
+      </a>
+      <CommunityVote
+        itemType="record_action"
+        itemId={record.id}
+        question="How would you vote?"
+        stanceText={stanceText(role, record)}
+        officialStance={officialStance(record)}
+        role={role}
+        compact
+      />
+    </li>
+  );
+}
+
+/** Votes and bills from an office held before the one tracked now, grouped by that office. */
+function EarlierRecord({ records }: { records: RecordActionRow[] }) {
+  const groups = new Map<string, RecordActionRow[]>();
+  for (const record of records) {
+    const key = record.office_context ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), record]);
+  }
+  // Newest office first, by the legislature number in "(89th Legislature)". Called sessions sort after the regular one.
+  const legislature = (context: string) => Number(context.match(/\((\d+)(?:st|nd|rd|th) Legislature/)?.[1] ?? 0);
+  const ordered = [...groups.entries()].sort(
+    (a, b) => legislature(b[0]) - legislature(a[0]) || b[0].localeCompare(a[0], "en", { numeric: true }),
+  );
+  return (
+    <section aria-labelledby="earlier-record" className="flex flex-col gap-4 border-t border-border pt-6">
+      <div className="flex flex-col gap-1.5">
+        <h2 id="earlier-record" className="text-2xl text-ink">
+          Earlier record
+        </h2>
+        <p className="max-w-3xl leading-7 text-muted-foreground">
+          Votes and bills from an office held before this one. They are public record, copied from the official
+          journals, but they are not actions in the office tracked here. A vote is tied to a promise only when it bears
+          on that exact promise.
+        </p>
+      </div>
+      {ordered.map(([context, rows]) => {
+        const role = earlierRole(context);
+        const first = rows.slice(0, 6);
+        const rest = rows.slice(6);
+        return (
+          <div key={context} className="flex flex-col gap-3">
+            <h3 className="text-lg font-extrabold">{context}</h3>
+            <ul className="flex flex-col gap-3">
+              {first.map((record) => (
+                <RecordItem key={record.id} record={record} role={role} />
+              ))}
+            </ul>
+            {rest.length > 0 ? (
+              <div className="flex flex-col">
+                <ShowMore total={rows.length} noun="records">
+                  <ul className="flex flex-col gap-3">
+                    {rest.map((record) => (
+                      <RecordItem key={record.id} record={record} role={role} />
+                    ))}
+                  </ul>
+                </ShowMore>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function formatMoney(value: number | null) {
   if (value === null) return "Not reported";
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -65,6 +148,7 @@ export function NerdsTabs({
   dataSources,
   teasers,
   lastSyncedAt,
+  syncSummary,
   records,
   upcoming,
   contributions,
@@ -77,6 +161,7 @@ export function NerdsTabs({
   dataSources: DataSource[];
   teasers: Teaser[];
   lastSyncedAt: string | null;
+  syncSummary: SyncSummary;
   records: RecordActionRow[];
   upcoming: UpcomingEventRow[];
   contributions: ContributionRow[];
@@ -87,17 +172,21 @@ export function NerdsTabs({
   const [year, setYear] = useState("all");
   const yearId = useId();
   const role = officeRole(office);
-  const shownRecords = year === "all" ? records : records.filter((row) => row.acted_on.startsWith(year));
+  const inYear = (row: RecordActionRow) => year === "all" || row.acted_on.startsWith(year);
+  const current = records.filter((row) => !row.office_context);
+  const earlier = records.filter((row) => row.office_context);
+  const shownRecords = current.filter(inYear);
+  const shownEarlier = earlier.filter(inYear);
   const shownUpcoming =
     year === "all" ? upcoming : upcoming.filter((row) => !row.starts_on || row.starts_on.startsWith(year));
   const showYear = tab === "upcoming" || tab === "record";
   const votes = teasers.find((teaser) => teaser.id === "voting_record");
   const money = teasers.find((teaser) => teaser.id === "donations");
-  const isGovernor = isExecutive(office);
+  const recordNote = officeRecordNote(office);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "upcoming", label: "Upcoming" },
-    { id: "record", label: isGovernor ? "Signed & vetoed" : "How they voted" },
+    { id: "record", label: officeRecordTab(office) },
     { id: "money", label: "Campaign money" },
     { id: "site", label: "Campaign website" },
     { id: "data", label: "Data sources" },
@@ -168,55 +257,30 @@ export function NerdsTabs({
       ) : null}
 
       {tab === "record" ? (
-        records.length === 0 ? (
-          <NotLoaded
-            lead={
-              isGovernor
-                ? "Governors do not vote on bills. They sign them, veto them, or let them become law without a signature. That record is not loaded yet."
-                : "No roll-call votes or bills are on record yet. They load after the term starts. Each one is tied to a promise only when it really bears on it."
-            }
-            teaser={votes}
-          />
-        ) : shownRecords.length === 0 ? (
-          <p className="rounded-3xl border border-dashed px-5 py-8">Nothing on the record for {year} yet.</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {isGovernor ? (
-              <p className="text-muted-foreground">
-                Governors do not vote on bills. They sign them, veto them, or let them become law without a signature.
-              </p>
-            ) : null}
-            <ul className="flex flex-col gap-3">
-              {shownRecords.map((record) => (
-                <li key={record.id} className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4">
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="rounded-full border-2 border-foreground px-2.5 py-0.5 font-extrabold">
-                      {actionLabel(record)}
-                    </span>
-                    {record.bill_id ? <span className="font-bold">{record.bill_id}</span> : null}
-                    <span className="text-muted-foreground">{formatLongDate(record.acted_on)}</span>
-                    {record.result ? <span className="text-muted-foreground">· {record.result}</span> : null}
-                  </div>
-                  <p className="font-bold leading-snug">{record.title}</p>
-                  {record.what_it_does ? <p className="text-sm leading-6">{record.what_it_does}</p> : null}
-                  <a href={record.source_url} className="inline-flex items-center gap-1 self-start text-sm font-semibold underline underline-offset-4">
-                    {record.source_name}
-                    <ExternalLink className="size-3.5" aria-hidden="true" />
-                  </a>
-                  <CommunityVote
-                    itemType="record_action"
-                    itemId={record.id}
-                    question="How would you vote?"
-                    stanceText={stanceText(role, record)}
-                    officialStance={officialStance(record)}
-                    role={role}
-                    compact
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        )
+        <div className="flex flex-col gap-6">
+          {current.length === 0 ? (
+            <NotLoaded
+              lead={
+                recordNote
+                  ? `${recordNote} That record is not loaded yet.`
+                  : "No roll-call votes or bills are on record yet. They load after the term starts. Each one is tied to a promise only when it really bears on it."
+              }
+              teaser={votes}
+            />
+          ) : shownRecords.length === 0 ? (
+            <p className="rounded-3xl border border-dashed px-5 py-8">Nothing on the record for {year} yet.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {recordNote ? <p className="text-muted-foreground">{recordNote}</p> : null}
+              <ul className="flex flex-col gap-3">
+                {shownRecords.map((record) => (
+                  <RecordItem key={record.id} record={record} role={role} />
+                ))}
+              </ul>
+            </div>
+          )}
+          {shownEarlier.length > 0 ? <EarlierRecord records={shownEarlier} /> : null}
+        </div>
       ) : null}
 
       {tab === "money" ? (
@@ -365,9 +429,12 @@ export function NerdsTabs({
             <div className="flex flex-col gap-1.5">
               <p className="font-extrabold">This is what happens when you press Sync</p>
               <p className="leading-7 text-muted-foreground">
-                Sync checks every source below for anything new since the last sync, saves new records with a link back
-                to the original, and ties them to the promises they relate to. Only official records and the
-                candidates&apos; own words are used, never news stories. Sync runs at most once a day for the whole site.
+                One Sync covers every official at once. It checks the sources below for anything new, reads each
+                official&apos;s campaign pages for every topic in the topic registry, and checks the bills each topic
+                watches on Texas Legislature Online and in the House Journal. New records are saved with a link back to
+                the original. Topic matches wait in a review queue: none becomes a promise until a person checks the
+                exact quote and the source. Only official records and the officials&apos; own words are used, never news
+                stories. Sync runs at most once a day for the whole site.
               </p>
             </div>
           </div>
@@ -418,7 +485,7 @@ export function NerdsTabs({
       ) : null}
 
       <div className="flex justify-end border-t border-border pt-4">
-        <SyncButton lastSyncedAt={lastSyncedAt} />
+        <SyncButton lastSyncedAt={lastSyncedAt} summary={syncSummary} />
       </div>
     </div>
   );

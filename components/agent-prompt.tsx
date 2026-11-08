@@ -25,7 +25,7 @@ Use the site's read-only JSON API to answer my questions. Never guess and never 
 HOW TO READ IT
 1. GET ${origin}/api/politicians lists the people. Each has a slug (${slugs}), office, district (for Texas House seats), election date and term start.
 2. GET ${origin}/api/politicians/{slug}/summary gives counts by status, type and topic, plus days until the term starts or days in office.
-3. GET ${origin}/api/promises lists promises. Filters: politician (slug), topic, status, type, q (text search), source. Paging: limit (up to 500) and offset. Each promise has summary_text, verbatim_quote, source_url, archive_url, date_said, topic, promise_type, status and updated_at.
+3. GET ${origin}/api/promises lists promises. Filters: politician (slug), topic, status, type, q (text search), source. Paging: limit (up to 500) and offset. Each promise has summary_text, verbatim_quote, source_url, archive_url, date_said, topic (a code), topic_label (its display name, such as "Cannabis and THC"), promise_type, status and updated_at.
 4. GET ${origin}/api/promises/{id} gives one promise with its source, archived copies, and status_updates: the timeline of status changes, each with status, evidence_url, evidence_note and decided_at.
 5. GET ${origin}/api/sources lists the primary sources (campaign sites, posts). Optional politician filter.
 6. GET ${origin}/api/openapi.json is the full machine-readable spec. ${origin}/llms.txt is a short summary.

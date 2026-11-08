@@ -1,8 +1,11 @@
-// Sync for Promise vs. Delivered. One run per 24 hours for the whole site.
+// Sync for Promise vs. Delivered. One run per 24 hours for the whole site, covering
+// every official and every active topic in tx_topics (see topics.ts).
 // The cooldown is claimed atomically in Postgres (tx_tracker.tx_claim_sync).
 // Each source runs on its own; a failure is written to the run's errors and
 // does not stop the others. Records are copied from primary sources only.
 import { createClient } from "npm:@supabase/supabase-js@2";
+
+import { type Log, topicSweep } from "./topics.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -27,7 +30,10 @@ type Politician = {
   election_date: string | null;
   term_start: string | null;
 };
-type Log = { counts: Record<string, number>; errors: { source: string; message: string }[]; notes: string[] };
+
+function add(log: Log, key: string, by: number) {
+  log.counts[key] = ((log.counts[key] as number | undefined) ?? 0) + by;
+}
 
 function reply(body: unknown, status = 200, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
@@ -127,7 +133,7 @@ async function fec(p: Politician, log: Log) {
     ],
     "politician_id,cycle",
   );
-  log.counts.fec_summaries = (log.counts.fec_summaries ?? 0) + 1;
+  add(log, "fec_summaries", 1);
 
   if (!committeeId) return;
   const gifts = (await getJson(
@@ -148,7 +154,7 @@ async function fec(p: Politician, log: Log) {
       source_url: (row.pdf_url as string) ?? `https://www.fec.gov/data/receipts/?committee_id=${committeeId}`,
       external_id: `fec:${row.sub_id}`,
     }));
-  log.counts.fec_contributions = (log.counts.fec_contributions ?? 0) + (await upsert("tx_contributions", rows, "external_id"));
+  add(log, "fec_contributions", await upsert("tx_contributions", rows, "external_id"));
 }
 
 // --- Congress.gov: bills the senator sponsored or co-sponsored.
@@ -194,7 +200,7 @@ async function congress(p: Politician, log: Log) {
         source_url: `https://www.congress.gov/bill/${ordinal(bill.congress)}-congress/${BILL_SLUGS[bill.type.toUpperCase()] ?? "senate-bill"}/${bill.number}`,
         external_id: `congress:${bill.congress}:${bill.type}:${bill.number}:${kind}`,
       }));
-    log.counts[`congress_${kind}`] = (log.counts[`congress_${kind}`] ?? 0) + (await upsert("tx_record_actions", rows, "external_id"));
+    add(log, `congress_${kind}`, await upsert("tx_record_actions", rows, "external_id"));
   }
 }
 
@@ -259,7 +265,7 @@ async function senateVotes(p: Politician, log: Log) {
       external_id: `senate:${congressNo}:${session}:${vote.number}`,
     });
   }
-  log.counts.senate_votes = (log.counts.senate_votes ?? 0) + (await upsert("tx_record_actions", rows, "external_id"));
+  add(log, "senate_votes", await upsert("tx_record_actions", rows, "external_id"));
 }
 
 async function loadDataGovKey() {
@@ -284,9 +290,14 @@ async function runSync(runId: string) {
           `${p.name}: Texas Legislature Online, the Office of the Governor and the Texas Ethics Commission are not automated yet. Their records are added by hand.`,
         );
       }
+      if (p.office === "tx_lt_governor") {
+        log.notes.push(
+          `${p.name}: the Texas Senate Journal and the Texas Ethics Commission are not automated yet. Earlier Texas House votes on watched bills are read by the topic sweep.`,
+        );
+      }
       if (p.office === "tx_house") {
         log.notes.push(
-          `${p.name}: Texas Legislature Online, Texas House record votes and the Texas Ethics Commission are not automated yet. Their records are added by hand.`,
+          `${p.name}: Texas House record votes for the new term and the Texas Ethics Commission are not automated yet. Votes on watched bills are read by the topic sweep.`,
         );
       }
       for (const [name, run] of sources) {
@@ -297,6 +308,11 @@ async function runSync(runId: string) {
         }
       }
     }
+  } catch (err) {
+    log.errors.push({ source: "sync", message: err instanceof Error ? err.message : String(err) });
+  }
+  try {
+    await topicSweep(db, log);
   } catch (err) {
     log.errors.push({ source: "sync", message: err instanceof Error ? err.message : String(err) });
   } finally {
@@ -338,7 +354,7 @@ Deno.serve(async (req) => {
     {
       ok: true,
       last_synced_at: claim.last_started_at,
-      message: "Sync started. New records show up on the site within a few minutes.",
+      message: "Sync started for every official and topic. New records show up on the site within a few minutes.",
     },
     202,
   );

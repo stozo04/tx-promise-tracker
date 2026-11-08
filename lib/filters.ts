@@ -1,4 +1,4 @@
-import { isPromiseType, isStatus, topicLabel } from "@/lib/format";
+import { isPromiseType, isStatus } from "@/lib/format";
 import { PROMISE_TYPES, STATUSES, type Politician, type PromiseRow } from "@/lib/types";
 import { normalizeUrl } from "@/lib/urls";
 
@@ -88,7 +88,7 @@ export function filterPromises(
         promise.verbatim_quote,
         promise.notes ?? "",
         promise.topic ?? "",
-        promise.topic ? topicLabel(promise.topic) : "",
+        promise.topic ? promise.topic_label : "",
       ]
         .join("\n")
         .toLowerCase();

@@ -26,9 +26,13 @@ const TYPE_LABELS: Record<string, string> = {
   platform: "Platform",
 };
 
+/**
+ * Labels for topics that are not in the topic registry (tx_tracker.tx_topics).
+ * A registry row's label always wins, so a topic added there needs no entry here.
+ */
 const TOPIC_LABELS: Record<string, string> = {
   affordability: "Affordability",
-  cannabis_thc: "Cannabis and THC",
+  child_care: "Child care",
   corruption_democracy: "Corruption and democracy",
   data_centers: "Data centers",
   health_care: "Health care",
@@ -47,6 +51,7 @@ const TOPIC_LABELS: Record<string, string> = {
   social_media_artificial_intelligence_tech: "Social media, AI, and tech",
   taxes_cost_of_living: "Taxes and the cost of living",
   veterans: "Veterans",
+  water: "Water",
 };
 
 export function isStatus(value: string): value is Status {
@@ -74,9 +79,10 @@ export function officeLabel(person: { office: string; district?: string | null }
   return officeTitle(person);
 }
 
-export function topicLabel(topic: string | null) {
+/** Registry labels first, then the fallback list above. Pass the registry's labels when you have them. */
+export function topicLabel(topic: string | null, registry: Record<string, string> = {}) {
   if (!topic) return "Unspecified topic";
-  return TOPIC_LABELS[topic] ?? humanize(topic);
+  return registry[topic] ?? TOPIC_LABELS[topic] ?? humanize(topic);
 }
 
 export function humanize(value: string) {

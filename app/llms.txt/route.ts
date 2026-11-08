@@ -34,6 +34,7 @@ ${lines}
 - GET ${origin}/api/promises/{id}
 - GET ${origin}/api/sources?politician=
 
+topic is a code such as cannabis_thc. topic_label is its display name.
 type is explicit_pledge or platform.
 status is pending, in_progress, kept, broken, partial, superseded, or unverified.
 
