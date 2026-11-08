@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dropdown } from "@/components/dropdown";
 import { filterPromises } from "@/lib/filters";
-import { topicLabel } from "@/lib/format";
 import { PROMISE_TYPES, STATUSES, type PromiseRow } from "@/lib/types";
 
 export function PromiseExplorer({
@@ -25,6 +24,13 @@ export function PromiseExplorer({
   const type = sp.get("type") ?? "all";
   const source = sp.get("source") ?? "";
   const qParam = sp.get("q") ?? "";
+  // Labels were resolved on the server from the topic registry.
+  const labels = useMemo(() => {
+    const map = new Map<string, string>([["unspecified", "Unspecified topic"]]);
+    for (const promise of promises) if (promise.topic) map.set(promise.topic, promise.topic_label);
+    return map;
+  }, [promises]);
+  const topicLabel = useCallback((code: string) => labels.get(code) ?? code, [labels]);
   const [draft, setDraft] = useState(qParam);
   const [syncedQuery, setSyncedQuery] = useState(qParam);
   if (qParam !== syncedQuery) {
@@ -89,7 +95,7 @@ export function PromiseExplorer({
         return [key, sorted] as const;
       })
       .sort((a, b) => b[1].length - a[1].length || topicLabel(a[0]).localeCompare(topicLabel(b[0])));
-  }, [result.promises]);
+  }, [result.promises, topicLabel]);
 
   const filtersOn = status !== "all" || topic !== "all" || type !== "all" || source || qParam || draft;
 

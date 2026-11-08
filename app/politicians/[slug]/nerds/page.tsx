@@ -10,6 +10,7 @@ import { termYears } from "@/lib/delivered";
 import { officeLabel } from "@/lib/format";
 import { loadLedger, politicianBySlug } from "@/lib/queries";
 import { teasersFor } from "@/lib/roadmap";
+import { syncSummary } from "@/lib/sync";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -79,6 +80,7 @@ async function NerdsRecord({ params }: Props) {
         dataSources={dataSourcesFor(politician.office)}
         teasers={teasersFor(politician.office)}
         lastSyncedAt={lastSyncedAt}
+        syncSummary={syncSummary(ledger)}
         records={records}
         upcoming={upcoming}
         contributions={contributions}

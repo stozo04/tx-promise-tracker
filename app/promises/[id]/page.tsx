@@ -13,7 +13,6 @@ import {
   hostname,
   officeLabel,
   statusLabel,
-  topicLabel,
   typeLabel,
 } from "@/lib/format";
 import { snapshotsForPromise } from "@/lib/present";
@@ -91,7 +90,7 @@ async function PromiseRecord({ params }: Props) {
           <span className="rounded-full bg-secondary px-2 py-1 font-medium">
             {typeLabel(promise.promise_type)}
           </span>
-          <span className="text-muted-foreground">{topicLabel(promise.topic)}</span>
+          <span className="text-muted-foreground">{promise.topic_label}</span>
         </div>
         {politician ? (
           <p className="text-sm text-muted-foreground">
@@ -238,7 +237,7 @@ async function PromiseRecord({ params }: Props) {
 
       {related.length > 0 && politician ? (
         <section className="space-y-2">
-          <h2 className="text-2xl text-ink">More on {topicLabel(promise.topic).toLowerCase()}</h2>
+          <h2 className="text-2xl text-ink">More on {promise.topic_label.toLowerCase()}</h2>
           <ul className="space-y-2 text-sm">
             {related.map((row) => (
               <li key={row.id}>

@@ -32,6 +32,8 @@ export type Politician = {
   portrait_url?: string | null;
   portrait_credit?: string | null;
   portrait_source_url?: string | null;
+  /** Campaign pages outside the main sitemap (petition subdomains) that Sync reads for topics. */
+  campaign_watch_urls?: string[];
   status: string;
   created_at: string;
   updated_at: string;
@@ -53,6 +55,8 @@ export type PromiseRow = {
   created_at: string;
   updated_at: string;
   promise_type: string;
+  /** The topic's label, resolved on the server from the topic registry (tx_topics), with lib/format.ts as fallback. */
+  topic_label: string;
 };
 
 export type SourceRow = {
@@ -114,14 +118,38 @@ export type RecordActionRow = {
   bill_id: string | null;
   title: string;
   what_it_does: string | null;
-  position: "yea" | "nay" | "present" | "not_voting" | null;
+  position: "yea" | "nay" | "present" | "not_voting" | "absent" | null;
   result: string | null;
   acted_on: string;
   source_name: string;
   source_url: string;
   promise_id: string | null;
   external_id: string;
+  /** Set for votes and bills from an earlier office, e.g. "Texas House, District 47 (88th Legislature)". Null means the office tracked now. */
+  office_context: string | null;
   created_at: string;
+};
+
+/** A topic in the registry. Active topics are checked for every official on every Sync. */
+export type TopicRow = {
+  code: string;
+  label: string;
+  keywords: string[];
+  related_bills: { session: string; bill: string }[];
+  active: boolean;
+};
+
+/** A keyword match or bill action waiting for a person to review it. Never a promise by itself. */
+export type TopicFindingRow = {
+  id: string;
+  politician_id: string | null;
+  topic: string;
+  kind: "page" | "post" | "bill_action";
+  url: string;
+  excerpt: string;
+  keyword: string;
+  found_at: string;
+  status: "new" | "promoted" | "dismissed";
 };
 
 export type UpcomingEventRow = {
@@ -189,6 +217,8 @@ export type Ledger = {
   contributions: ContributionRow[];
   contributionSummaries: ContributionSummaryRow[];
   voteTotals: VoteTotalRow[];
+  topics: TopicRow[];
+  topicFindings: TopicFindingRow[];
 };
 
 export type ArchiveCard = {

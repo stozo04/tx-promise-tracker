@@ -16,6 +16,7 @@
 // Requires Playwright (`npm i playwright` in a scratch folder) and a Chromium binary; pass its path.
 // Use the browser's real user agent. Faking one got 403s from WordPress.com hosting.
 // Pages with forms: disable the form afterwards and record that in the manifest's "modifications".
+// Squarespace sites need three more passes to be static and private: see scripts/squarespace-mirror/README.md.
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";

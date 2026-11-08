@@ -13,7 +13,7 @@ export function teasersFor(office?: string): Teaser[] {
   const money = office ? officeMoneySources(office) : null;
   const votes = record
     ? `Possible sources: ${record}.`
-    : "Possible sources: Congress.gov and Senate roll calls for the U.S. Senate, Texas bill signings and vetoes for the governor, and Texas House record votes for state representatives.";
+    : "Possible sources: Congress.gov and Senate roll calls for the U.S. Senate, Texas bill signings and vetoes for the governor, the Texas Senate Journal for the lieutenant governor, and Texas House record votes for state representatives.";
   const donations = money
     ? `Possible source: ${money}.`
     : "Possible sources: FEC filings for the U.S. Senate. Texas Ethics Commission reports for state offices.";

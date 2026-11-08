@@ -52,7 +52,7 @@ export const DATA_SOURCES: DataSource[] = [
     href: "https://capitol.texas.gov",
     linkText: "capitol.texas.gov",
     state: "planned",
-    offices: ["governor", "tx_house"],
+    offices: ["governor", "tx_lt_governor", "tx_house"],
   },
   {
     name: "Texas House Journal",
@@ -64,6 +64,17 @@ export const DATA_SOURCES: DataSource[] = [
     linkText: "house.texas.gov",
     state: "planned",
     offices: ["tx_house"],
+  },
+  {
+    name: "Texas Senate Journal",
+    who: "Secretary of the Texas Senate",
+    what: "What happened on the Senate floor each day, including bill referrals and any vote the lieutenant governor casts",
+    how: "The official Senate Journal for each day the Senate meets",
+    why: "The Senate records its own proceedings in its journal",
+    href: "https://journals.senate.texas.gov",
+    linkText: "journals.senate.texas.gov",
+    state: "planned",
+    offices: ["tx_lt_governor"],
   },
   {
     name: "Office of the Governor",
@@ -118,7 +129,7 @@ export const DATA_SOURCES: DataSource[] = [
     href: "https://www.ethics.state.tx.us",
     linkText: "ethics.state.tx.us",
     state: "planned",
-    offices: ["governor", "tx_house"],
+    offices: ["governor", "tx_lt_governor", "tx_house"],
   },
 ];
 

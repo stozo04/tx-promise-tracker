@@ -41,7 +41,7 @@ export const openApiSpec = {
         summary: "List promises",
         parameters: [
           { name: "politician", in: "query", schema: { type: "string" }, description: "Politician slug." },
-          { name: "topic", in: "query", schema: { type: "string" }, description: "Topic key, such as public_education." },
+          { name: "topic", in: "query", schema: { type: "string" }, description: "Topic key, such as public_education or cannabis_thc. Each promise also has topic_label, the topic's display name." },
           {
             name: "status",
             in: "query",
@@ -62,7 +62,7 @@ export const openApiSpec = {
           { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
         ],
         responses: {
-          "200": { description: "Matching promises. total is the filtered count before paging." },
+          "200": { description: "Matching promises. total is the filtered count before paging. Each promise has topic (a code) and topic_label (its display name)." },
           "400": { description: "Unknown status, type, limit, or offset." },
           "404": { description: "Unknown politician slug." },
         },

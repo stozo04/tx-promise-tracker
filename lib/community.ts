@@ -24,6 +24,7 @@ const POSITION_LABELS: Record<string, string> = {
   nay: "voted Nay",
   present: "voted Present",
   not_voting: "did not vote",
+  absent: "was absent",
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -47,6 +48,7 @@ export function actionLabel(action: Pick<RecordActionRow, "kind" | "position">) 
     if (action.position === "nay") return "Nay";
     if (action.position === "present") return "Present";
     if (action.position === "not_voting") return "Did not vote";
+    if (action.position === "absent") return "Absent";
     return "Vote";
   }
   const labels: Record<string, string> = {

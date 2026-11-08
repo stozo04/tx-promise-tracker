@@ -9,7 +9,7 @@ import { DirectionChip } from "@/components/direction-chip";
 import { Dropdown } from "@/components/dropdown";
 import { StatusPill } from "@/components/status-pill";
 import type { DeliveredPromise } from "@/lib/delivered";
-import { formatLongDate, topicLabel } from "@/lib/format";
+import { formatLongDate } from "@/lib/format";
 
 /**
  * "What they said. What they did." One pair of cards per promise that has
@@ -89,7 +89,7 @@ export function SaidDid({
             <li key={promise.id} id={`pledge-${promise.id}`} className="flex flex-wrap items-stretch gap-4">
               <article className="flex flex-[1_1_22rem] flex-col gap-3.5 rounded-3xl border border-[var(--said-border)] bg-[var(--said-bg)] p-6">
                 <p className="border-b border-[var(--said-border)] pb-3 text-xs font-extrabold uppercase tracking-[0.1em]">
-                  Said · {topicLabel(promise.topic)}
+                  Said · {promise.topicLabel}
                 </p>
                 <blockquote className="line-clamp-6 font-heading text-xl leading-snug font-semibold sm:text-2xl">
                   “{promise.quote}”

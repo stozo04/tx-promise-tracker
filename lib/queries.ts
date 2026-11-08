@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { getSupabaseEnv } from "@/lib/env";
+import { topicLabel } from "@/lib/format";
 import type {
   ContributionRow,
   ContributionSummaryRow,
@@ -15,6 +16,8 @@ import type {
   SnapshotRow,
   SourceRow,
   StatusUpdateRow,
+  TopicFindingRow,
+  TopicRow,
   UpcomingEventRow,
   VoteTotalRow,
 } from "@/lib/types";
@@ -32,7 +35,8 @@ type LooseSchema = {
   };
 };
 
-const POLITICIAN_ORDER = ["james-talarico", "gina-hinojosa"];
+/** Header switch order: Senator, Governor, Lt. Governor, then House districts. */
+const POLITICIAN_ORDER = ["james-talarico", "gina-hinojosa", "vikki-goodwin", "zach-herbert"];
 
 async function fetchTable(db: LooseSchema, table: string) {
   const pageSize = 1000;
@@ -78,6 +82,8 @@ export async function loadLedger(): Promise<Ledger> {
     contributions,
     contributionSummaries,
     voteTotals,
+    topics,
+    topicFindings,
   ] = await Promise.all([
     fetchTable(db, "politicians"),
     fetchTable(db, "promises"),
@@ -90,7 +96,11 @@ export async function loadLedger(): Promise<Ledger> {
     fetchTable(db, "tx_contributions"),
     fetchTable(db, "tx_contribution_summaries"),
     fetchTable(db, "tx_community_vote_totals"),
+    fetchTable(db, "tx_topics"),
+    fetchTable(db, "tx_topic_findings"),
   ]);
+
+  const registry = Object.fromEntries((topics as TopicRow[]).map((topic) => [topic.code, topic.label]));
 
   if (politicians.length === 0 || promises.length === 0) {
     throw new Error(
@@ -102,7 +112,10 @@ export async function loadLedger(): Promise<Ledger> {
     fetchedAt: new Date().toISOString(),
     supabaseUrl: url,
     politicians: politicians as Politician[],
-    promises: promises as PromiseRow[],
+    promises: (promises as Omit<PromiseRow, "topic_label">[]).map((promise) => ({
+      ...promise,
+      topic_label: topicLabel(promise.topic, registry),
+    })),
     sources: sources as SourceRow[],
     snapshots: snapshots as SnapshotRow[],
     statusUpdates: statusUpdates as StatusUpdateRow[],
@@ -123,6 +136,8 @@ export async function loadLedger(): Promise<Ledger> {
       in_state_itemized: row.in_state_itemized === null ? null : Number(row.in_state_itemized),
     })),
     voteTotals: voteTotals as VoteTotalRow[],
+    topics: (topics as TopicRow[]).sort((a, b) => a.label.localeCompare(b.label)),
+    topicFindings: (topicFindings as TopicFindingRow[]).sort((a, b) => b.found_at.localeCompare(a.found_at)),
   };
 
   ledger.politicians.sort((a, b) => {

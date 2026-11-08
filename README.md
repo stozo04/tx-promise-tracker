@@ -103,6 +103,9 @@ A status does not change on a hunch. Pending stays pending until the evidence is
 
 - **James Talarico:** bills he sponsors or co-sponsors (Congress.gov) and his Senate roll-call votes (senate.gov), loaded by Sync once his term starts.
 - **Gina Hinojosa:** bill signings, vetoes, and executive orders are added by hand for now. Texas Legislature Online and the Office of the Governor are not automated yet.
+- **Vikki Goodwin:** the lieutenant governor presides over the Texas Senate and votes only in the Committee of the Whole or to break a tie. The Texas Senate Journal is not automated yet.
+- **Zach Herbert:** Texas House record votes once the term starts. Not automated yet.
+- **Earlier record:** votes and bills from an office held before the one tracked now (for example, a state representative's House votes) have `office_context` set, such as "Texas House, District 47 (88th Legislature)". The page shows them under "Earlier record", never as actions in the new office. Sync adds House record votes on each topic's watched bills for every official listed in `tx_tracker.tx_legislative_service`.
 
 A record is tied to a promise (`promise_id`) only when it really bears on it. A missing link is not a claim that it is unrelated.
 
@@ -119,13 +122,22 @@ Each action in a Did card and each record on the For the nerds page has a "How w
 
 ### Sync
 
-Anyone can press Sync, but the whole site gets one sync per 24 hours. `tx_tracker.tx_claim_sync()` claims the slot under an advisory lock, so two presses at once cannot both start one. Inside the window the button says how long to wait. Each source runs on its own, and its counts, notes, and errors are written to `tx_tracker.ingest_runs`.
+Anyone can press "Sync all officials" (on each For the nerds page and on How we track), but the whole site gets one sync per 24 hours. `tx_tracker.tx_claim_sync()` claims the slot under an advisory lock, so two presses at once cannot both start one. Inside the window the button says how long to wait. Each source runs on its own, and its counts, notes, and errors are written to `tx_tracker.ingest_runs`.
+
+One run covers every official and every active topic in `tx_tracker.tx_topics` (see `supabase/functions/tx_sync/topics.ts`):
+
+- **Campaign pages.** Each official's campaign sitemap, plus `politicians.campaign_watch_urls` for subdomain pages, is listed in `tx_watched_pages`. Each run reads up to 80 pages, oldest-checked first, inside a time budget, so the rest wait for the next run. A page is matched again only when its visible text changes. Keyword matches are whole-word; an all-caps keyword such as `THC` matches case-sensitively.
+- **Watched bills.** For each topic's `related_bills`, Sync reads the Texas Legislature Online history and the House Journal record votes, and stores how each official in `tx_legislative_service` voted, with `office_context` set. Stored votes are never overwritten. Bill actions from the last 30 days become findings.
+- **X posts.** Only with an X API bearer token in `tx_private_settings` (`x_bearer_token`). Without one, the run notes say so. X is never scraped.
+- **Review queue.** Matches go to `tx_topic_findings` with status `new`. A finding never becomes a promise by itself: a person confirms the verbatim quote and the source, adds the promise, and sets the finding to `promoted` (with `promise_id`) or `dismissed`.
+
+To add a topic, insert a row in `tx_topics` with a code, a label, keywords and any related bills. The next Sync checks it for everyone, and the site uses its label.
 
 ## Supabase
 
 Everything for this project is prefixed `tx_`.
 
-- `supabase/migrations/`: the `tx_` tables (`tx_record_actions`, `tx_upcoming_events`, `tx_contributions`, `tx_contribution_summaries`, `tx_community_votes`, `tx_private_settings`), the `tx_community_vote_totals` view, and `tx_claim_sync()`. Public roles can read records and vote totals. They cannot read raw votes or private settings, and they cannot write.
+- `supabase/migrations/`: the `tx_` tables (`tx_record_actions`, `tx_upcoming_events`, `tx_contributions`, `tx_contribution_summaries`, `tx_community_votes`, `tx_private_settings`, `tx_topics`, `tx_topic_findings`, `tx_watched_pages`, `tx_legislative_service`), the `tx_community_vote_totals` view, and `tx_claim_sync()`. Public roles can read records and vote totals. They cannot read raw votes or private settings, and they cannot write.
 - `supabase/functions/tx_community_vote`: `GET ?items=status_update:<id>,record_action:<id>` returns your vote and the totals. `POST {item_type, item_id, choice}` records a vote, or answers `409` "You've already voted on this."
 - `supabase/functions/tx_sync`: `POST` starts a sync, or answers `429` with how long to wait.
 - `tx_tracker.tx_private_settings` holds the IP hash salt and the api.data.gov key (Congress.gov and FEC). Only `service_role` can read it. An Edge Function secret named `TX_DATA_GOV_API_KEY` takes precedence if you set one.

@@ -12,8 +12,15 @@ type OfficeInfo = {
   role: string;
   /** Years in one term. */
   termYears: number;
-  /** "chamber" offices vote on bills. The governor signs or vetoes them instead. */
-  kind: "chamber" | "executive";
+  /**
+   * "chamber" offices vote on bills. The governor signs or vetoes them instead.
+   * The lieutenant governor presides over the Texas Senate and votes only in narrow cases.
+   */
+  kind: "chamber" | "executive" | "presiding";
+  /** The label of the record tab on the "For the nerds" page. */
+  recordTab: string;
+  /** What the record means for this office, shown above it. Null when the plain label says enough. */
+  recordNote: string | null;
   /** What the upcoming tab will hold once it is loaded. */
   upcoming: string;
   /** Where votes or bill actions will come from. */
@@ -33,6 +40,8 @@ export const OFFICES: Record<string, OfficeInfo> = {
     role: "senator",
     termYears: 6,
     kind: "chamber",
+    recordTab: "How they voted",
+    recordNote: null,
     upcoming: "Upcoming Senate votes and committee hearings",
     recordSources: "Congress.gov and Senate roll calls",
     moneySources: "FEC filings",
@@ -45,10 +54,28 @@ export const OFFICES: Record<string, OfficeInfo> = {
     role: "governor",
     termYears: 4,
     kind: "executive",
+    recordTab: "Signed & vetoed",
+    recordNote:
+      "Governors do not vote on bills. They sign them, veto them, or let them become law without a signature.",
     upcoming: "Upcoming bill deadlines, special sessions, and signing dates",
     recordSources: "Texas bill signings and vetoes",
     moneySources: "Texas Ethics Commission reports",
     recordState: "Added by hand for now.",
+    moneyState: "Not automated yet.",
+  },
+  tx_lt_governor: {
+    label: "Lieutenant Governor of Texas",
+    short: "Lt. Governor",
+    role: "lieutenant governor",
+    termYears: 4,
+    kind: "presiding",
+    recordTab: "Senate record",
+    recordNote:
+      "The lieutenant governor is President of the Texas Senate and appoints its committees. Under the Texas Constitution (Article 4, Section 16), the office votes only in the Committee of the Whole Senate or to break a tie.",
+    upcoming: "Upcoming Texas Senate sessions and committee hearings",
+    recordSources: "The Texas Senate Journal and Texas Legislature Online",
+    moneySources: "Texas Ethics Commission reports",
+    recordState: "Not automated yet.",
     moneyState: "Not automated yet.",
   },
   tx_house: {
@@ -57,6 +84,8 @@ export const OFFICES: Record<string, OfficeInfo> = {
     role: "representative",
     termYears: 2,
     kind: "chamber",
+    recordTab: "How they voted",
+    recordNote: null,
     upcoming: "Upcoming Texas House floor votes and committee hearings",
     recordSources: "Texas Legislature Online and Texas House record votes",
     moneySources: "Texas Ethics Commission reports",
@@ -82,7 +111,7 @@ export function officeTitle(person: OfficeHolder) {
   return person.district ? `${label}, District ${person.district}` : label;
 }
 
-/** The header switch label: "Senator", "Governor", "District 112". */
+/** The header switch label: "Senator", "Governor", "Lt. Governor", "District 112". */
 export function officeShort(person: OfficeHolder & { name: string }) {
   if (person.district) return `District ${person.district}`;
   return info(person.office)?.short ?? person.name.split(" ")[0];
@@ -98,6 +127,14 @@ export function officeTermYears(office: string) {
 
 export function isExecutive(office: string) {
   return info(office)?.kind === "executive";
+}
+
+export function officeRecordTab(office: string) {
+  return info(office)?.recordTab ?? "How they voted";
+}
+
+export function officeRecordNote(office: string) {
+  return info(office)?.recordNote ?? null;
 }
 
 export function officeUpcoming(office: string) {
@@ -121,4 +158,14 @@ export function officeRecordPlan(office: string) {
 export function officeMoneyPlan(office: string) {
   const entry = info(office);
   return entry ? `${entry.moneySources}. ${entry.moneyState}` : "Sources not chosen yet.";
+}
+
+/**
+ * The role word for a record from an earlier office, read from its office_context
+ * ("Texas House, District 47 (88th Legislature)" -> "representative").
+ */
+export function earlierRole(officeContext: string) {
+  if (/^Texas House\b/.test(officeContext)) return "representative";
+  if (/^Texas Senate\b/.test(officeContext)) return "state senator";
+  return "official";
 }
