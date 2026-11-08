@@ -18,6 +18,8 @@ export type Politician = {
   name: string;
   slug: string;
   office: string;
+  /** Texas House district number, e.g. "112". Empty for statewide offices. */
+  district?: string | null;
   party: string | null;
   election_date: string | null;
   term_start: string | null;

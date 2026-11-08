@@ -284,6 +284,11 @@ async function runSync(runId: string) {
           `${p.name}: Texas Legislature Online, the Office of the Governor and the Texas Ethics Commission are not automated yet. Their records are added by hand.`,
         );
       }
+      if (p.office === "tx_house") {
+        log.notes.push(
+          `${p.name}: Texas Legislature Online, Texas House record votes and the Texas Ethics Commission are not automated yet. Their records are added by hand.`,
+        );
+      }
       for (const [name, run] of sources) {
         try {
           await run(p, log);

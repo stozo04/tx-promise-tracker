@@ -1,3 +1,5 @@
+import { officeMoneySources, officeRecordSources } from "@/lib/offices";
+
 export type Teaser = {
   id: "voting_record" | "donations";
   title: string;
@@ -5,31 +7,22 @@ export type Teaser = {
   sources: string;
 };
 
-const VOTES: Record<string, string> = {
-  "james-talarico": "Possible sources: Congress.gov and Senate roll calls.",
-  "gina-hinojosa": "Possible sources: Texas bill signings and vetoes.",
-};
-
-const DONATIONS: Record<string, string> = {
-  "james-talarico": "Possible source: FEC filings.",
-  "gina-hinojosa": "Possible source: Texas Ethics Commission reports.",
-};
-
-export function teasersFor(slug?: string): Teaser[] {
-  const votes =
-    slug && VOTES[slug]
-      ? VOTES[slug]
-      : "Possible sources: Congress.gov and Senate roll calls for James Talarico. Texas bill signings and vetoes for Gina Hinojosa.";
-  const donations =
-    slug && DONATIONS[slug]
-      ? DONATIONS[slug]
-      : "Possible sources: FEC filings for James Talarico. Texas Ethics Commission reports for Gina Hinojosa.";
+/** Teasers for one office's page, or for the whole site when no office is given. */
+export function teasersFor(office?: string): Teaser[] {
+  const record = office ? officeRecordSources(office) : null;
+  const money = office ? officeMoneySources(office) : null;
+  const votes = record
+    ? `Possible sources: ${record}.`
+    : "Possible sources: Congress.gov and Senate roll calls for the U.S. Senate, Texas bill signings and vetoes for the governor, and Texas House record votes for state representatives.";
+  const donations = money
+    ? `Possible source: ${money}.`
+    : "Possible sources: FEC filings for the U.S. Senate. Texas Ethics Commission reports for state offices.";
 
   return [
     {
       id: "voting_record",
       title: "Voting record",
-      body: slug
+      body: office
         ? "After the term starts, each vote can be shown next to the promise it actually relates to."
         : "See how each official votes once they are in office, linked to the promise it relates to.",
       sources: votes,

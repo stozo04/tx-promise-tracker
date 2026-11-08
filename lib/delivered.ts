@@ -1,4 +1,5 @@
 import { hostname } from "@/lib/format";
+import { officeTermYears } from "@/lib/offices";
 import type { Ledger, Politician, PromiseRow, StatusUpdateRow } from "@/lib/types";
 
 /**
@@ -126,7 +127,7 @@ export function summarize(rows: DeliveredPromise[]): DeliveredSummary {
 export function termYears(politician: Politician) {
   if (!politician.term_start) return [];
   const start = Number(politician.term_start.slice(0, 4));
-  const length = politician.office === "us_senate" ? 6 : 4;
+  const length = officeTermYears(politician.office);
   return Array.from({ length }, (_, index) => String(start + index));
 }
 

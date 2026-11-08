@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { LedgerLoading } from "@/components/ledger-loading";
 import { AtAGlance } from "@/components/at-a-glance";
 import { FlagHero } from "@/components/flag-hero";
 import { PromiseExplorer } from "@/components/promise-explorer";
 import { SaidDid } from "@/components/said-did";
 import { deliveredFor, summarize, termYears } from "@/lib/delivered";
 import { formatLongDate, officeLabel } from "@/lib/format";
+import { officeRole } from "@/lib/offices";
 import { loadLedger, politicianBySlug } from "@/lib/queries";
 import { termClock } from "@/lib/term";
 
@@ -25,11 +27,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!politician) return { title: "Not found" };
   return {
     title: `${politician.name}: promise vs. delivered`,
-    description: `What ${politician.name}, ${officeLabel(politician.office)}, promised on the campaign trail, next to what the public record shows they did.`,
+    description: `What ${politician.name}, ${officeLabel(politician)}, promised on the campaign trail, next to what the public record shows they did.`,
   };
 }
 
-export default async function PoliticianPage({ params }: Props) {
+/**
+ * The page returns at once and the official's record streams in under Suspense,
+ * so switching officials in the header shows a loading state instead of blocking.
+ */
+export default function PoliticianPage({ params }: Props) {
+  return (
+    <Suspense fallback={<LedgerLoading />}>
+      <PoliticianRecord params={params} />
+    </Suspense>
+  );
+}
+
+async function PoliticianRecord({ params }: Props) {
   const { slug } = await params;
   const ledger = await loadLedger();
   const politician = politicianBySlug(ledger, slug);
@@ -66,7 +80,7 @@ export default async function PoliticianPage({ params }: Props) {
         promises={delivered.filter((promise) => promise.actions.length > 0)}
         years={termYears(politician)}
         emptyNote={emptyNote}
-        role={politician.office === "governor" ? "governor" : "senator"}
+        role={officeRole(politician.office)}
       />
 
       <section aria-labelledby="every-promise" className="flex flex-col gap-4">

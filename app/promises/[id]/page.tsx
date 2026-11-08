@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
+import { LedgerLoading } from "@/components/ledger-loading";
 import { StatusPill } from "@/components/status-pill";
 import {
   decidedByLabel,
@@ -36,7 +38,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function PromisePage({ params }: Props) {
+/** The page returns at once and the promise streams in under Suspense, so navigating here never blocks on params. */
+export default function PromisePage({ params }: Props) {
+  return (
+    <Suspense fallback={<LedgerLoading />}>
+      <PromiseRecord params={params} />
+    </Suspense>
+  );
+}
+
+async function PromiseRecord({ params }: Props) {
   const { id } = await params;
   const ledger = await loadLedger();
   const promise = ledger.promises.find((row) => row.id === id);
@@ -84,7 +95,7 @@ export default async function PromisePage({ params }: Props) {
         </div>
         {politician ? (
           <p className="text-sm text-muted-foreground">
-            {politician.name} · {officeLabel(politician.office)}
+            {politician.name} · {officeLabel(politician)}
           </p>
         ) : null}
         {same ? (

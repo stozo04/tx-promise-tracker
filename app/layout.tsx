@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Figtree, Fraunces } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { Suspense } from "react";
 
 import { SiteFooter } from "@/components/site-footer";
 import { ExternalLinksInNewTab } from "@/components/external-links";
@@ -37,9 +38,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
+/**
+ * The header's official switch needs the ledger. It loads under Suspense so the root layout
+ * never waits on data: every page and navigation can show the shell at once.
+ */
+async function HeaderWithOfficials() {
   const ledger = await loadLedger();
+  return (
+    <SiteHeader
+      politicians={ledger.politicians.map((politician) => ({
+        name: politician.name,
+        slug: politician.slug,
+        office: politician.office,
+        district: politician.district ?? null,
+      }))}
+    />
+  );
+}
 
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${figtree.variable} ${fraunces.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="flex min-h-full flex-col">
@@ -51,11 +68,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           >
             Skip to content
           </a>
-          <SiteHeader politicians={ledger.politicians.map((politician) => ({
-            name: politician.name,
-            slug: politician.slug,
-            office: politician.office,
-          }))} />
+          <Suspense fallback={<SiteHeader politicians={[]} />}>
+            <HeaderWithOfficials />
+          </Suspense>
           <main id="main" className="flex-1">
             {children}
           </main>

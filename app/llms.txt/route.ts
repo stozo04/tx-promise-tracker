@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const lines = ledger.politicians
     .map((politician) => {
       const count = ledger.promises.filter((promise) => promise.politician_id === politician.id).length;
-      return `- ${politician.name} (${politician.slug}): ${count} promises, office ${politician.office}, term starts ${politician.term_start ?? "unrecorded"}`;
+      return `- ${politician.name} (${politician.slug}): ${count} promises, office ${politician.office}${politician.district ? `, district ${politician.district}` : ""}, term starts ${politician.term_start ?? "unrecorded"}`;
     })
     .join("\n");
 

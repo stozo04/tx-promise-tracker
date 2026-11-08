@@ -1,0 +1,31 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * latino-gothic-variable:
+ *   - http://typekit.com/eulas/0000000000000000774d56e9
+ * spirits-neutral:
+ *   - http://typekit.com/eulas/00000000000000007735f3f4
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2025-10-08 13:15:38 UTC"}*/
+
+@import url("/archive/gina/act/assets/bbe33c52af7672651cb2.css");
+
+@font-face {
+font-family:"spirits-neutral";
+src:url("/archive/gina/act/assets/4f054e32221ad912825d.woff2") format("woff2"),url("/archive/gina/act/assets/3dda4cece6ab253b2592.woff") format("woff"),url("/archive/gina/act/assets/446944ac384f469cb9ca.bin") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"latino-gothic-variable";
+src:url("/archive/gina/act/assets/c0c4b18ae109a15f719c.woff2") format("woff2"),url("/archive/gina/act/assets/eaff4b34b8068ed1d870.woff") format("woff"),url("/archive/gina/act/assets/4967d1f1ea4051191d1b.bin") format("opentype");
+font-display:auto;font-style:normal;font-weight:1 100;font-stretch:normal;
+}
+
+.tk-spirits-neutral { font-family: "spirits-neutral",serif; }
+.tk-latino-gothic-variable { font-family: "latino-gothic-variable",sans-serif; }

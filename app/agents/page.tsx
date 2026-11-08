@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AgentPrompt } from "@/components/agent-prompt";
+import { loadLedger } from "@/lib/queries";
 import { GITHUB_REPO_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -8,7 +9,9 @@ export const metadata: Metadata = {
   description: "A ready-made prompt that lets your AI agent read the Promise vs. Delivered API and report updates.",
 };
 
-export default function AgentsPage() {
+export default async function AgentsPage() {
+  const { politicians } = await loadLedger();
+  const people = politicians.map(({ name, slug, office, district }) => ({ name, slug, office, district: district ?? null }));
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
       <header className="space-y-3">
@@ -19,7 +22,7 @@ export default function AgentsPage() {
           the answer with sources, and your mouse gets the day off.
         </p>
       </header>
-      <AgentPrompt />
+      <AgentPrompt people={people} />
       <p className="text-sm">
         <a className="font-semibold text-bluebonnet underline" href="/llms.txt">
           llms.txt

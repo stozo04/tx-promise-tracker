@@ -114,7 +114,7 @@ export function FlagHero({
 
         <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-5 rounded-2xl bg-card p-5 shadow-lg sm:p-7">
           <div className="flex flex-col gap-1">
-            <p className="text-sm font-semibold text-muted-foreground">{officeLabel(politician.office)}</p>
+            <p className="text-sm font-semibold text-muted-foreground">{officeLabel(politician)}</p>
             <h1 id="official-name" className="text-4xl leading-tight text-ink sm:text-5xl">
               {politician.name}
             </h1>

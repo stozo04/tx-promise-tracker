@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { PromiseCard } from "@/components/promise-card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,6 @@ export function PromiseExplorer({
   promises: PromiseRow[];
   topics: string[];
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
   const status = sp.get("status") ?? "all";
@@ -33,6 +32,13 @@ export function PromiseExplorer({
     setDraft(qParam);
   }
 
+  // Filtering happens in the browser, so the URL is updated with the History API instead of
+  // router.replace. That keeps every keystroke from re-rendering the page on the server.
+  // Next.js keeps useSearchParams in sync with replaceState.
+  const setUrl = useCallback((qs: string) => {
+    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  }, [pathname]);
+
   useEffect(() => {
     if (draft === qParam) return;
     const handle = window.setTimeout(() => {
@@ -40,11 +46,10 @@ export function PromiseExplorer({
       const trimmed = draft.trim();
       if (trimmed) params.set("q", trimmed);
       else params.delete("q");
-      const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      setUrl(params.toString());
     }, 250);
     return () => window.clearTimeout(handle);
-  }, [draft, pathname, qParam, router, sp]);
+  }, [draft, qParam, setUrl, sp]);
 
   function replace(next: Record<string, string>) {
     const params = new URLSearchParams(sp.toString());
@@ -52,8 +57,7 @@ export function PromiseExplorer({
       if (!value || value === "all") params.delete(key);
       else params.set(key, value);
     }
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    setUrl(params.toString());
   }
 
   const result = useMemo(
@@ -164,7 +168,7 @@ export function PromiseExplorer({
                 className="h-9"
                 onClick={() => {
                   setDraft("");
-                  router.replace(pathname, { scroll: false });
+                  setUrl("");
                 }}
               >
                 Clear filters
@@ -191,7 +195,9 @@ export function PromiseExplorer({
 
       {result.error ? null : groups.length === 0 ? (
         <p className="rounded-3xl border border-dashed border-border bg-card px-5 py-8 text-center">
-          Nothing matches. Clear a filter, or try a shorter search.
+          {promises.length === 0
+            ? "No promises are on record yet. Each one appears here with a verbatim quote and its source once it is added."
+            : "Nothing matches. Clear a filter, or try a shorter search."}
         </p>
       ) : (
         groups.map(([key, rows]) => (

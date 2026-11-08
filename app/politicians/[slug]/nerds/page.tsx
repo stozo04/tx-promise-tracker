@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
+import { LedgerLoading } from "@/components/ledger-loading";
 import { NerdsTabs } from "@/components/nerds-tabs";
 import { screenshotCards } from "@/lib/archives";
 import { dataSourcesFor } from "@/lib/data-sources";
@@ -23,11 +25,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!politician) return { title: "Not found" };
   return {
     title: `For the nerds: ${politician.name}`,
-    description: `The raw record on ${politician.name}, ${officeLabel(politician.office)}: upcoming events, votes, campaign money, the archived campaign site, and where every record comes from.`,
+    description: `The raw record on ${politician.name}, ${officeLabel(politician)}: upcoming events, votes, campaign money, the archived campaign site, and where every record comes from.`,
   };
 }
 
-export default async function NerdsPage({ params }: Props) {
+/** The page returns at once and the record streams in under Suspense, so switching officials never blocks. */
+export default function NerdsPage({ params }: Props) {
+  return (
+    <Suspense fallback={<LedgerLoading />}>
+      <NerdsRecord params={params} />
+    </Suspense>
+  );
+}
+
+async function NerdsRecord({ params }: Props) {
   const { slug } = await params;
   const ledger = await loadLedger();
   const politician = politicianBySlug(ledger, slug);
@@ -57,7 +68,7 @@ export default async function NerdsPage({ params }: Props) {
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10">
       <header className="flex flex-col gap-3">
-        <p className="text-sm font-semibold text-muted-foreground">{officeLabel(politician.office)}</p>
+        <p className="text-sm font-semibold text-muted-foreground">{officeLabel(politician)}</p>
         <h1 className="text-4xl text-ink sm:text-5xl">For the nerds</h1>
         <p className="max-w-2xl text-lg leading-8">The raw record on {politician.name}, with every line cited.</p>
       </header>
@@ -66,7 +77,7 @@ export default async function NerdsPage({ params }: Props) {
         office={politician.office}
         archives={archives}
         dataSources={dataSourcesFor(politician.office)}
-        teasers={teasersFor(politician.slug)}
+        teasers={teasersFor(politician.office)}
         lastSyncedAt={lastSyncedAt}
         records={records}
         upcoming={upcoming}

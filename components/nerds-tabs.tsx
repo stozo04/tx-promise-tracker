@@ -11,6 +11,7 @@ import { SyncButton } from "@/components/sync-button";
 import { actionLabel, officialStance, stanceText } from "@/lib/community";
 import type { DataSource } from "@/lib/data-sources";
 import { formatLongDate, formatNumber } from "@/lib/format";
+import { isExecutive, officeRole, officeUpcoming } from "@/lib/offices";
 import type { Teaser } from "@/lib/roadmap";
 import type {
   ArchiveCard,
@@ -85,14 +86,14 @@ export function NerdsTabs({
   const [tab, setTab] = useState<Tab>("upcoming");
   const [year, setYear] = useState("all");
   const yearId = useId();
-  const role = office === "governor" ? "governor" : "senator";
+  const role = officeRole(office);
   const shownRecords = year === "all" ? records : records.filter((row) => row.acted_on.startsWith(year));
   const shownUpcoming =
     year === "all" ? upcoming : upcoming.filter((row) => !row.starts_on || row.starts_on.startsWith(year));
   const showYear = tab === "upcoming" || tab === "record";
   const votes = teasers.find((teaser) => teaser.id === "voting_record");
   const money = teasers.find((teaser) => teaser.id === "donations");
-  const isGovernor = office === "governor";
+  const isGovernor = isExecutive(office);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "upcoming", label: "Upcoming" },
@@ -139,9 +140,7 @@ export function NerdsTabs({
         upcoming.length === 0 ? (
           <NotLoaded
             lead={
-              isGovernor
-                ? `Upcoming bill deadlines, special sessions, and signing dates for ${name} are not loaded yet.`
-                : `Upcoming Senate votes and committee hearings for ${name} are not loaded yet.`
+              `${officeUpcoming(office)} for ${name} are not loaded yet.`
             }
             teaser={votes}
           />
