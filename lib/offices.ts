@@ -60,8 +60,8 @@ export const OFFICES: Record<string, OfficeInfo> = {
     upcoming: "Upcoming bill deadlines, special sessions, and signing dates",
     recordSources: "Texas bill signings and vetoes",
     moneySources: "Texas Ethics Commission reports",
-    recordState: "Added by hand for now.",
-    moneyState: "Not automated yet.",
+    recordState: "Loaded by Sync once the term starts.",
+    moneyState: "Loaded by Sync.",
   },
   tx_lt_governor: {
     label: "Lieutenant Governor of Texas",
@@ -75,8 +75,8 @@ export const OFFICES: Record<string, OfficeInfo> = {
     upcoming: "Upcoming Texas Senate sessions and committee hearings",
     recordSources: "The Texas Senate Journal and Texas Legislature Online",
     moneySources: "Texas Ethics Commission reports",
-    recordState: "Not automated yet.",
-    moneyState: "Not automated yet.",
+    recordState: "Loaded by Sync once the term starts.",
+    moneyState: "Loaded by Sync.",
   },
   tx_house: {
     label: "Texas House of Representatives",
@@ -89,8 +89,8 @@ export const OFFICES: Record<string, OfficeInfo> = {
     upcoming: "Upcoming Texas House floor votes and committee hearings",
     recordSources: "Texas Legislature Online and Texas House record votes",
     moneySources: "Texas Ethics Commission reports",
-    recordState: "Not automated yet.",
-    moneyState: "Not automated yet.",
+    recordState: "Loaded by Sync once the term starts.",
+    moneyState: "Loaded by Sync.",
   },
 };
 

@@ -434,7 +434,7 @@ export function NerdsTabs({
                 watches on Texas Legislature Online and in the House Journal. New records are saved with a link back to
                 the original. Topic matches wait in a review queue: none becomes a promise until a person checks the
                 exact quote and the source. Only official records and the officials&apos; own words are used, never news
-                stories. Sync runs at most once a day for the whole site.
+                stories. Sync runs once a day for the whole site, and at 11:30 pm CT on its own if nobody pressed it that day.
               </p>
             </div>
           </div>

@@ -63,7 +63,8 @@ check fails the pull request, and **[review]** means a reviewer has to catch it.
     hard-coded `supabase.co` addresses. [lint]
 16. The public Edge Functions keep `verify_jwt = false` (see `supabase/config.toml`) and enforce
     their own limits:
-    - Sync runs at most once per 24 hours for the whole site.
+    - Sync runs at most once per calendar day (Central time) for the whole site. If nobody starts
+      it, the nightly job (`tx_tracker.tx_nightly_sync`, 11:30 pm CT) does.
     - One vote per connection per item.
     - Votes are accepted only from this site's origins.
     - The client IP is read from `cf-connecting-ip` and stored only as a salted hash.

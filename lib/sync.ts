@@ -1,11 +1,43 @@
-/** One site-wide sync per day. Anyone can ask for one, but only once every 24 hours. */
-export const SYNC_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+/**
+ * One site-wide sync per calendar day in Central time. Anyone can start it; if nobody does, the
+ * nightly job starts it at 11:30 pm CT. Must match tx_tracker.tx_claim_sync().
+ */
+export const SYNC_TIME_ZONE = "America/Chicago";
 
+const DAY_PARTS = new Intl.DateTimeFormat("en-US", {
+  timeZone: SYNC_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+/** "2026-11-09", the Central-time calendar day of a moment. */
+export function centralDay(ms: number) {
+  const parts = Object.fromEntries(DAY_PARTS.formatToParts(new Date(ms)).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+/** The first moment of the next Central-time day after `ms` (handles the daylight-time switch). */
+export function nextCentralMidnight(ms: number) {
+  const day = centralDay(ms);
+  // Midnight is 05:00 or 06:00 UTC; step forward from 04:00 UTC of the next date until the day changes.
+  const [y, m, d] = day.split("-").map(Number);
+  let probe = Date.UTC(y, m - 1, d + 1, 4, 0, 0);
+  while (centralDay(probe) === day) probe += 60 * 60 * 1000;
+  return probe;
+}
+
+/** How long until the next sync may start: zero when nobody has synced today (Central time). */
 export function cooldownRemaining(lastSyncedAt: string | null, now: number) {
   if (!lastSyncedAt) return 0;
   const last = Date.parse(lastSyncedAt);
   if (Number.isNaN(last)) return 0;
-  return Math.max(0, last + SYNC_COOLDOWN_MS - now);
+  if (centralDay(last) !== centralDay(now)) return 0;
+  return Math.max(0, nextCentralMidnight(now) - now);
 }
 
 /** "6h 12m", "45m", or "less than a minute". */
@@ -38,7 +70,12 @@ export type SyncSummary = {
     pagesChecked: number | null;
     pagesChanged: number | null;
     billsChecked: number | null;
-    errors: number;
+    /** "button" or "schedule". */
+    triggeredBy: string | null;
+    /** Each source that failed, with its message. */
+    errors: { source: string; message: string }[];
+    /** One line per skipped source, backlog, or source that is not automated yet. */
+    notes: string[];
   } | null;
   officials: {
     slug: string;
@@ -51,11 +88,38 @@ type SummaryInput = {
   politicians: { id: string; slug: string; name: string }[];
   topics: { code: string; label: string; active: boolean }[];
   topicFindings: { politician_id: string | null; topic: string; status: string }[];
-  ingestRuns: { source_type: string; started_at: string; finished_at: string | null; counts: Record<string, unknown>; errors: unknown[] }[];
+  ingestRuns: {
+    source_type: string;
+    started_at: string;
+    finished_at: string | null;
+    counts: Record<string, unknown>;
+    errors: unknown[];
+    notes?: string | null;
+    triggered_by?: string | null;
+  }[];
 };
 
 function asNumber(value: unknown) {
   return typeof value === "number" ? value : null;
+}
+
+/** The run's errors as { source, message }, whatever shape they were saved in. */
+export function runErrors(errors: unknown[]) {
+  return (Array.isArray(errors) ? errors : []).map((row) => {
+    const value = (row ?? {}) as { source?: unknown; message?: unknown };
+    return {
+      source: typeof value.source === "string" ? value.source : "unknown source",
+      message: typeof value.message === "string" ? value.message : JSON.stringify(row),
+    };
+  });
+}
+
+/** The run's notes, one per line, without the placeholder the run starts with. */
+export function runNotes(notes: string | null | undefined) {
+  return (notes ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !/^Started by the (public Sync button|nightly schedule)$/.test(line));
 }
 
 /** The last Sync run, per official and per topic, plus findings still waiting for review. */
@@ -99,7 +163,9 @@ export function syncSummary(ledger: SummaryInput): SyncSummary {
           pagesChecked,
           pagesChanged: asNumber(counts.topic_pages_changed),
           billsChecked: asNumber(counts.topic_bills_checked),
-          errors: Array.isArray(run.errors) ? run.errors.length : 0,
+          triggeredBy: run.triggered_by ?? null,
+          errors: runErrors(run.errors),
+          notes: runNotes(run.notes),
         }
       : null,
     officials,

@@ -38,15 +38,40 @@ function LastRun({ summary }: { summary: SyncSummary }) {
       <div className="flex flex-col gap-3 border-t border-border px-4 py-3">
         {lastRun ? (
           <p className="leading-6 text-muted-foreground">
-            {lastRun.finishedAt ? "Finished" : "Started"} {SYNCED_AT.format(new Date(lastRun.finishedAt ?? lastRun.startedAt))} CT.{" "}
+            {lastRun.finishedAt ? "Finished" : "Started"} {SYNCED_AT.format(new Date(lastRun.finishedAt ?? lastRun.startedAt))} CT
+            {lastRun.triggeredBy === "schedule" ? ", started by the nightly schedule" : ""}.{" "}
             {lastRun.pagesChecked === null
               ? "That run did not check campaign pages for topics."
               : `${plural(lastRun.pagesChecked, "campaign page", "campaign pages")} checked, ${plural(lastRun.pagesChanged ?? 0, "page", "pages")} new or changed, ${plural(lastRun.billsChecked ?? 0, "watched bill", "watched bills")} checked.`}
-            {lastRun.errors > 0 ? ` ${plural(lastRun.errors, "source", "sources")} failed and will be retried next time.` : ""}
+            {lastRun.errors.length > 0 ? ` ${plural(lastRun.errors.length, "source", "sources")} failed and will be retried next time.` : " No source failed."}
           </p>
         ) : (
           <p className="text-muted-foreground">No sync has run yet.</p>
         )}
+        {lastRun && lastRun.errors.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            <h3 className="font-semibold">Failed sources</h3>
+            <ul className="flex flex-col gap-1.5">
+              {lastRun.errors.map((error, i) => (
+                <li key={`${error.source}-${i}`} className="rounded-xl bg-[var(--partly-bg)] px-3 py-2 leading-6 text-[var(--partly-fg)]">
+                  <span className="font-semibold">{error.source}</span>: <span className="break-words">{error.message}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {lastRun && lastRun.notes.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            <h3 className="font-semibold">Run notes</h3>
+            <ul className="flex list-disc flex-col gap-1 pl-5 leading-6 text-muted-foreground">
+              {lastRun.notes.map((note, i) => (
+                <li key={i} className="break-words">
+                  {note}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <ul className="flex flex-col gap-2">
           {officials.map((official) => (
             <li key={official.slug} className="flex flex-col gap-0.5">
@@ -70,7 +95,8 @@ function LastRun({ summary }: { summary: SyncSummary }) {
 
 /**
  * Ask the server for a fresh pull from every source, for every official and every topic.
- * The whole site gets one sync per 24 hours. Inside that window the button explains how long to wait.
+ * The whole site gets one sync per calendar day (Central time). If nobody starts it, the nightly job
+ * runs it at 11:30 pm CT. After a run the button explains how long until the next day.
  */
 export function SyncButton({ lastSyncedAt, summary }: { lastSyncedAt: string | null; summary?: SyncSummary }) {
   const [last, setLast] = useState(lastSyncedAt);
@@ -122,7 +148,7 @@ export function SyncButton({ lastSyncedAt, summary }: { lastSyncedAt: string | n
             {status}
           </p>
           <p className="max-w-md text-sm text-muted-foreground">
-            Checks every official&apos;s sources and topics. Runs at most once a day for the whole site.
+            Checks every official&apos;s sources and topics. Runs once a day for the whole site, at 11:30 pm CT if nobody starts it sooner.
           </p>
         </div>
         <button
