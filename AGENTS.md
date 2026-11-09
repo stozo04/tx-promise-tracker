@@ -81,3 +81,9 @@ check fails the pull request, and **[review]** means a reviewer has to catch it.
 19. Check UI changes in a real browser, in light and dark mode, before calling them done. [review]
 20. When the JSON API changes, update the agent prompt (`components/agent-prompt.tsx`),
     `app/llms.txt/route.ts`, and `lib/openapi.ts` to match. [review]
+21. When Sync changes, update `SYNC.md` in the same pull request: sources, IDs, rules, the diagram,
+    the order of stages, the counts, the limits, and the tests. Sync means
+    `supabase/functions/tx_sync/` (apart from `tests/`), `scripts/sync-live-check.ts`,
+    `lib/sync.ts`, `components/sync-button.tsx`, and `app/api/sync/`. A pure refactor that changes
+    nothing SYNC.md describes says `SYNC.md: no change needed` and why in the pull request
+    description. See "Keeping this file current" in SYNC.md. [CI]
