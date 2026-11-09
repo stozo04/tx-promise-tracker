@@ -24,6 +24,7 @@ The code lives in:
 | Events: U.S. Senate floor schedule and committee hearings | [`events_senate.ts`](supabase/functions/tx_sync/events_senate.ts) |
 | Events: campaign events pages | [`events_campaign.ts`](supabase/functions/tx_sync/events_campaign.ts) |
 | The Events page, the event page, and the nerds page's Upcoming tab | [`app/events`](app/events), [`components/events-calendar.tsx`](components/events-calendar.tsx), [`lib/events.ts`](lib/events.ts) |
+| Which source fills which events (by `event_key` prefix), and Congress.gov links for hearing bills | [`lib/event-sources.ts`](lib/event-sources.ts) |
 | Unit tests on saved primary-source pages | [`tests/sync_test.ts`](supabase/functions/tx_sync/tests/sync_test.ts) |
 | Live check of every parser against the real sources (no writes) | [`scripts/sync-live-check.ts`](scripts/sync-live-check.ts) |
 | Claim, nightly job, IDs, TEC tables | [`supabase/migrations/20261109150000_tx_sync_gaps.sql`](supabase/migrations/20261109150000_tx_sync_gaps.sql) |
@@ -150,7 +151,10 @@ Rules:
 - **Refresh, unlike votes.** Events are upserted on `external_id`. A row is written only when it is new
   or when its kind, title, date, end date, time, place, details, body, bills, source link or status
   changed; then `status` becomes `changed` (or `cancelled`, below) and `updated_at` is set. A row that
-  did not change is not written. Nothing is deleted, and past events stay stored.
+  did not change is not written. Nothing is deleted, and past events stay stored. Stored rows are
+  looked up by the `external_id`s being written, whatever their date, so a date already past that a
+  source still lists (the convening day while that session is in progress) is compared, not added
+  again each run.
 - **Cancelled only when the source says so** ("cancel" in a TLO item, or a Senate hearing typed or
   described as cancelled or postponed). An event that drops off a source that lists everything
   upcoming (the TLO calendar and meeting feeds, senate.gov's hearing schedule, a campaign events page)
@@ -188,6 +192,13 @@ Rules:
   upon final adjourn." is stored as 2:30 PM with the full wording in `details`.
 - **Campaign events** keep only events the campaign's own organization hosts, labeled as campaign events
   (`is_campaign`), with the date, time, place and title as the page states them.
+- **Bills a Senate hearing names** are kept for every type senate.gov lists (S, HR, SJRES, HJRES, SRES,
+  HRES, SCONRES, HCONRES; nominations are not bills). The event page links each to Congress.gov for
+  the Congress in session on the hearing's date ("121st-congress"), and shows any other as text.
+- **"Not loaded yet."** Each source owns the `event_key` prefixes it writes (`law:`, `tlo_calendar:`,
+  `tlo_hearing:`, `senate_floor:`, `senate_schedule:`, `senate_hearing:`, `campaign:`). The Events page
+  and the Upcoming tab call a source loaded only when one of its own events is, so one source's events
+  never hide another that has none. A new event source adds its prefix to `lib/event-sources.ts`.
 - **Committee membership** is stored, never guessed: a hearing is matched only by committee code (and,
   for TLO, the same legislature, so a committee carries over into its called sessions). Until the
   representative's `tlo_member_code` for the 90th Legislature and the senator's `bioguide_id` are
@@ -381,8 +392,8 @@ deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/
 deno run --allow-net --allow-env=DATA_GOV_KEY --node-modules-dir=none scripts/sync-live-check.ts
 ```
 
-The tests run on real pages saved from each source (`tests/fixtures`): 43 tests, of which G1 to G8
-cover the event sources and the refresh rule. CI runs them on every pull request. Strip any keys a
+The tests run on real pages saved from each source (`tests/fixtures`): 46 tests, of which G1 to G10
+cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. CI runs them on every pull request. Strip any keys a
 saved page embeds before committing it (a Mobilize page carries Mapbox, Google, Algolia and Facebook
 browser keys; GitHub push protection blocks them). The live check reads the real sources and prints statistics; it writes nothing. Its `events`
 section (`scripts/sync-live-check.ts events`) prints, for each event source, how many items it parsed

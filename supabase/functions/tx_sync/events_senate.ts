@@ -90,8 +90,8 @@ export function parseSenateHearings(xml: string): SenateHearing[] {
     if (!code || !id || !date) continue;
     const timeText = tag(m[1], "time") ?? "";
     const bills = [...m[1].matchAll(/<AssociatedDocument[^>]*document_num="(\d+)"[^>]*document_prefix="([A-Z.]+)"/gi)]
-      .filter((d) => /^(S|HR|H\.R\.|SJRES|HJRES|SRES|SCONRES|HCONRES)$/i.test(d[2]))
-      .map((d) => `${d[2].toUpperCase()} ${d[1]}`);
+      .filter((d) => /^(S|HR|H\.R\.|SJRES|HJRES|SRES|HRES|SCONRES|HCONRES)$/i.test(d[2]))
+      .map((d) => `${d[2].toUpperCase().replace("H.R.", "HR")} ${d[1]}`);
     hearings.push({
       id,
       code: code.toUpperCase(),

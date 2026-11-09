@@ -19,24 +19,11 @@ export function kindLabel(kind: string) {
   return KIND_LABELS[kind as EventKind] ?? "Event";
 }
 
-/** Where each kind of event comes from, by office. Used for "Not loaded yet" and the page footer. */
-export const EVENT_SOURCES: { kind: EventKind; offices: string[]; source: string }[] = [
-  { kind: "session_day", offices: ["tx_house", "tx_lt_governor"], source: "the convening and 140th days from Tex. Gov't Code §301.001 and Tex. Const. art. 3" },
-  { kind: "session_day", offices: ["us_senate"], source: "the U.S. Senate floor schedule and tentative schedule on senate.gov" },
-  { kind: "floor_vote", offices: ["tx_house", "tx_lt_governor"], source: "Texas Legislature Online House and Senate calendars" },
-  { kind: "committee_hearing", offices: ["tx_house"], source: "Texas Legislature Online committee meeting notices" },
-  { kind: "committee_hearing", offices: ["us_senate"], source: "senate.gov committee hearing schedules" },
-  { kind: "deadline", offices: ["tx_house", "tx_lt_governor", "governor", "us_senate"], source: "dates the Texas Constitution, the Government Code and the U.S. Constitution set" },
-  { kind: "appearance", offices: ["tx_house", "tx_lt_governor", "governor", "us_senate"], source: "each campaign's own events page" },
-];
+// Which source fills which events lives in lib/event-sources.ts, which the Sync tests also load.
+export { EVENT_SOURCES, sourcesFor, unloadedSources } from "@/lib/event-sources";
 
 /** The sources behind the calendar, by short name, for the one-line footer. */
 export const EVENT_SOURCE_NAMES = ["Texas Legislature Online", "senate.gov", "the Texas Constitution and statutes", "campaign events pages"];
-
-/** "Texas Legislature Online committee meeting notices, senate.gov ..." for the kinds and offices shown. */
-export function sourcesFor(offices: string[], kind: string = "all") {
-  return [...new Set(EVENT_SOURCES.filter((s) => (kind === "all" || s.kind === kind) && s.offices.some((o) => offices.includes(o))).map((s) => s.source))];
-}
 
 /** One event as the calendar shows it: its rows for every official it concerns. */
 export type CalendarEvent = {
