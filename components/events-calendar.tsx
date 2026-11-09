@@ -17,8 +17,8 @@ import {
   monthTitle,
   OFFICIAL_COLORS,
   shiftMonth,
-  sourcesFor,
   timeLabel,
+  unloadedSources,
 } from "@/lib/events";
 import { cn } from "@/lib/utils";
 
@@ -164,11 +164,8 @@ export function EventsCalendar({
   const nextEvent = filtered.find((event) => event.date > `${month}-31`);
   const prevEvent = [...filtered].reverse().find((event) => event.date < `${month}-01`);
   const offices = official ? [official.office] : [...new Set(people.map((person) => person.office))];
-  // Sources with nothing loaded at all for what is shown: these are "not loaded yet", not just quiet this month.
-  const loadedKinds = new Set(filtered.map((event) => event.kind));
-  const missing = sourcesFor(offices, kind).filter((source) =>
-    sourcesForKinds(offices, kind, source).every((k) => !loadedKinds.has(k)),
-  );
+  // Sources with none of their own events for what is shown: "not loaded yet", not just quiet this month.
+  const missing = unloadedSources(offices, kind, filtered);
   const who = official ? official.name : "any official";
 
   const navButton =
@@ -327,11 +324,4 @@ export function EventsCalendar({
 
 function capitalize(text: string) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
-}
-
-/** The kinds of event a named source fills, for the offices shown. */
-function sourcesForKinds(offices: string[], kind: string, source: string) {
-  return (Object.keys(KIND_LABELS) as CalendarEvent["kind"][]).filter(
-    (k) => (kind === "all" || k === kind) && sourcesFor(offices, k).includes(source),
-  );
 }

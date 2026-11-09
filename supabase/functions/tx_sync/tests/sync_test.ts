@@ -2,6 +2,7 @@
 // and files from the primary sources, saved on 2026-11-09. Run: deno test --allow-read (see README).
 import { assert, assertEquals, assertExists } from "jsr:@std/assert@1";
 
+import { congressBillUrl, congressOn, ordinal as ordinalSuffix, unloadedSources } from "../../../../lib/event-sources.ts";
 import { cooldownRemaining, nextCentralMidnight, runErrors, runNotes, syncSummary } from "../../../../lib/sync.ts";
 import { allPages, congressBillRow, fecCycles, menuVotes, MAX_VOTES_PER_SYNC, nextPageUrl, senateSessions, senateVoteRow } from "../federal.ts";
 import { executiveOrdersIn, GOVERNOR_REPORTS, governorActionDate, monthsSince, ordersPrefix, parseArchivePosts } from "../governor.ts";
@@ -581,8 +582,16 @@ function fakeEventsDb(stored: Record<string, unknown>[]) {
   const written: Record<string, unknown>[][] = [];
   const db = {
     from: () => ({
+      // Applies the filters saveEvents uses, so a test sees what the real query would return.
       select: () => {
-        const chain = { eq: () => chain, like: () => chain, gte: () => Promise.resolve({ data: stored, error: null }) };
+        let rows = [...stored];
+        const chain = {
+          eq: (column: string, value: unknown) => ((rows = rows.filter((r) => r[column] === value)), chain),
+          in: (column: string, values: unknown[]) => ((rows = rows.filter((r) => values.includes(r[column]))), chain),
+          like: (column: string, pattern: string) => ((rows = rows.filter((r) => String(r[column]).startsWith(pattern.replace(/%$/, "")))), chain),
+          gte: (column: string, value: string) => ((rows = rows.filter((r) => String(r[column]) >= value)), chain),
+          then: (resolve: (result: { data: Record<string, unknown>[]; error: null }) => void) => resolve({ data: rows, error: null }),
+        };
         return chain;
       },
       upsert: (rows: Record<string, unknown>[]) => {
@@ -615,6 +624,73 @@ Deno.test("G8: events refresh: a changed time is updated and marked changed, a v
   await saveEvents(ctx, p, "TLO", "tlo_hearing:", [{ ...base, status: "cancelled" }], { from: "2027-03-01", complete: false });
   assertEquals(written[1][0].status, "cancelled");
   assertEquals(log.counts.events_changed, 2);
+});
+
+Deno.test("G8: a past date set by law that is already stored is compared, not added again (Bugbot, PR #9)", async () => {
+  const p = { id: "p1", slug: "zach-herbert", name: "Zach Herbert" };
+  const verified = new Set<LawKey>(["convene", "filing", "length"]);
+  // On 2027-02-01 the 90th session is in progress: its convening day (2027-01-12) is past but still emitted.
+  const rows = legalEvents("tx_house", "2027-02-01", verified, "2027-01-12").map((d) => forOfficial(d, p));
+  assertEquals(rows[0].starts_on, "2027-01-12");
+  const { db, written } = fakeEventsDb(rows.map((row) => ({ ...row, status: "changed" })));
+  const log: Log = { counts: {}, errors: [], notes: [] };
+  const ctx = { db, log, now: new Date("2027-02-01T18:00:00Z") } as unknown as Ctx;
+  await saveEvents(ctx, p, "Dates set by law", "law:", rows, { from: "2027-02-01", complete: false });
+  // Nothing is re-added, nothing is rewritten, and a stored "changed" status is kept.
+  assertEquals(written.length, 0);
+  assertEquals(log.counts.events_added, 0);
+  // On a first run mid-session the past date is stored once.
+  const fresh = fakeEventsDb([]);
+  await saveEvents({ ...ctx, db: fresh.db } as unknown as Ctx, p, "Dates set by law", "law:", rows, { from: "2027-02-01", complete: false });
+  assertEquals(fresh.written[0].length, 3);
+});
+
+Deno.test("G9: \"Not loaded yet\" names each source that has none of its own events (Bugbot, PR #9)", () => {
+  const all = ["us_senate", "governor", "tx_lt_governor", "tx_house"];
+  // Only dates set by law are loaded: Texas session days and deadlines.
+  const loaded = [
+    { kind: "session_day", key: "law:90R:convene" },
+    { kind: "deadline", key: "law:90R:day60" },
+  ];
+  const missing = unloadedSources(all, "all", loaded);
+  // A Texas session day does not make the Senate floor schedule look loaded, nor a hearing source the other.
+  assert(missing.includes("the U.S. Senate floor schedule and tentative schedule on senate.gov"));
+  assert(missing.includes("Texas Legislature Online committee meeting notices"));
+  assert(missing.includes("senate.gov committee hearing schedules"));
+  assert(!missing.includes("the convening and 140th days from Tex. Gov't Code §301.001 and Tex. Const. art. 3"));
+  assert(!missing.includes("dates the Texas Constitution, the Government Code and the U.S. Constitution set"));
+  // A House hearing loads only the TLO source.
+  const hearings = unloadedSources(all, "committee_hearing", [{ kind: "committee_hearing", key: "tlo_hearing:90R:C320:2027-03-02:08001" }]);
+  assertEquals(hearings, ["senate.gov committee hearing schedules"]);
+  // For the governor alone, only the governor's sources are named.
+  assertEquals(unloadedSources(["governor"], "all", []), [
+    "dates the Texas Constitution, the Government Code and the U.S. Constitution set",
+    "each campaign's own events page",
+  ]);
+});
+
+Deno.test("G10: every bill type a Senate hearing names links to Congress.gov with the right ordinal (Bugbot, PR #9)", () => {
+  assertEquals(congressOn("2027-03-02"), 120);
+  assertEquals(congressOn("2029-01-02"), 120); // A Congress starts on January 3.
+  assertEquals(congressOn("2029-01-03"), 121);
+  assertEquals(["1", "2", "3", "4", "11", "12", "13", "21", "101", "111", "121", "122", "123"].map((n) => ordinalSuffix(Number(n))), [
+    "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "101st", "111th", "121st", "122nd", "123rd",
+  ]);
+  const at = "2029-03-01";
+  assertEquals(congressBillUrl("S 12", at), "https://www.congress.gov/bill/121st-congress/senate-bill/12");
+  assertEquals(congressBillUrl("HR 5", at), "https://www.congress.gov/bill/121st-congress/house-bill/5");
+  assertEquals(congressBillUrl("H.R. 5", at), "https://www.congress.gov/bill/121st-congress/house-bill/5");
+  assertEquals(congressBillUrl("HJRES 3", at), "https://www.congress.gov/bill/121st-congress/house-joint-resolution/3");
+  assertEquals(congressBillUrl("SCONRES 7", at), "https://www.congress.gov/bill/121st-congress/senate-concurrent-resolution/7");
+  assertEquals(congressBillUrl("HCONRES 8", at), "https://www.congress.gov/bill/121st-congress/house-concurrent-resolution/8");
+  assertEquals(congressBillUrl("HRES 9", at), "https://www.congress.gov/bill/121st-congress/house-resolution/9");
+  assertEquals(congressBillUrl("PN 1256", at), null); // A nomination is not a bill.
+  // The parser keeps every bill type senate.gov lists, and normalizes "H.R." to "HR".
+  const xml = (prefix: string) =>
+    `<meeting><identifier>1</identifier><cmte_code>SSJU00</cmte_code><committee>Judiciary</committee><type>Open Hearing</type><date_iso_8601>2029-03-01</date_iso_8601><time>10:00 AM</time><Documents><AssociatedDocument congress="121" document_num="4" document_prefix="${prefix}"/></Documents><matter>x</matter></meeting>`;
+  assertEquals(["HJRES", "SCONRES", "HCONRES", "HRES", "H.R.", "PN"].map((prefix) => parseSenateHearings(xml(prefix))[0].bills), [
+    ["HJRES 4"], ["SCONRES 4"], ["HCONRES 4"], ["HRES 4"], ["HR 4"], [],
+  ]);
 });
 
 Deno.test("E2: every event source is in the registry for the offices it serves", () => {

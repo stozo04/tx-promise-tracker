@@ -121,6 +121,9 @@ const COMPARED = ["kind", "title", "starts_on", "ends_on", "starts_at", "locatio
  * `prefix` is the external_id prefix this source owns ("tlo_hearing:"). When `complete` is true the
  * rows are everything the source lists from `from` on, so a stored future row it no longer lists is
  * noted (never deleted, never marked cancelled unless the source says so).
+ *
+ * Stored rows are looked up by the external_ids being written, whatever their date, so an event
+ * already in the past (the convening day of a session still in progress) is compared, not re-added.
  */
 export async function saveEvents(
   ctx: Ctx,
@@ -130,14 +133,27 @@ export async function saveEvents(
   rows: EventRow[],
   opts: { from: string; complete: boolean },
 ) {
-  const { data, error } = await ctx.db
-    .from("tx_upcoming_events")
-    .select("external_id, kind, title, starts_on, ends_on, starts_at, location, details, body, bills, status, source_url")
-    .eq("politician_id", p.id)
-    .like("external_id", `${prefix}%`)
-    .gte("starts_on", opts.from);
-  if (error) throw new Error(`tx_upcoming_events: ${error.message}`);
-  const stored = new Map(((data ?? []) as Record<string, unknown>[]).map((row) => [row.external_id as string, row]));
+  const columns = "external_id, kind, title, starts_on, ends_on, starts_at, location, details, body, bills, status, source_url";
+  // The rows being written, by external_id and whatever their date.
+  const stored = new Map<string, Record<string, unknown>>();
+  const ids = rows.map((row) => row.external_id);
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await ctx.db.from("tx_upcoming_events").select(columns).eq("politician_id", p.id).in("external_id", ids.slice(i, i + 200));
+    if (error) throw new Error(`tx_upcoming_events: ${error.message}`);
+    for (const row of (data ?? []) as Record<string, unknown>[]) stored.set(row.external_id as string, row);
+  }
+  // This source's stored rows from `from` on, to notice an event the source no longer lists.
+  const upcoming = new Map<string, Record<string, unknown>>();
+  if (opts.complete) {
+    const { data, error } = await ctx.db
+      .from("tx_upcoming_events")
+      .select(columns)
+      .eq("politician_id", p.id)
+      .like("external_id", `${prefix}%`)
+      .gte("starts_on", opts.from);
+    if (error) throw new Error(`tx_upcoming_events: ${error.message}`);
+    for (const row of (data ?? []) as Record<string, unknown>[]) upcoming.set(row.external_id as string, row);
+  }
   const now = ctx.now.toISOString();
   const writes: Record<string, unknown>[] = [];
   let added = 0;
@@ -170,7 +186,7 @@ export async function saveEvents(
   bump(ctx.log, "events_changed", changed);
   if (opts.complete) {
     const listed = new Set(rows.map((row) => row.external_id));
-    const missing = [...stored.entries()].filter(([id, row]) => !listed.has(id) && row.status !== "cancelled");
+    const missing = [...upcoming.entries()].filter(([id, row]) => !listed.has(id) && row.status !== "cancelled");
     if (missing.length > 0) {
       ctx.log.notes.push(
         `${label}: ${missing.length} stored ${missing.length === 1 ? "event for" : "events for"} ${p.name} ${missing.length === 1 ? "is" : "are"} no longer listed (${missing

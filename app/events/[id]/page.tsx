@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { ExternalLink } from "lucide-react";
 
 import { LedgerLoading } from "@/components/ledger-loading";
+import { congressBillUrl } from "@/lib/event-sources";
 import { centralTime, kindLabel, longDay, monthTitle } from "@/lib/events";
 import { formatTimestamp, officeLabel } from "@/lib/format";
 import { loadLedger } from "@/lib/queries";
@@ -49,23 +50,6 @@ export default function EventPage({ params }: Props) {
   );
 }
 
-const BILL_URL: [RegExp, (m: RegExpMatchArray, congress: string) => string][] = [
-  [/^S (\d+)$/, (m, c) => `https://www.congress.gov/bill/${c}th-congress/senate-bill/${m[1]}`],
-  [/^SJRES (\d+)$/, (m, c) => `https://www.congress.gov/bill/${c}th-congress/senate-joint-resolution/${m[1]}`],
-  [/^SRES (\d+)$/, (m, c) => `https://www.congress.gov/bill/${c}th-congress/senate-resolution/${m[1]}`],
-  [/^(?:HR|H\.R\.) (\d+)$/, (m, c) => `https://www.congress.gov/bill/${c}th-congress/house-bill/${m[1]}`],
-];
-
-/** The Congress.gov page of a bill a Senate hearing names. */
-function billUrl(bill: string, date: string) {
-  const congress = String(119 + Math.floor((Number(date.slice(0, 4)) - 2025) / 2));
-  for (const [re, url] of BILL_URL) {
-    const match = bill.match(re);
-    if (match) return url(match, congress);
-  }
-  return null;
-}
-
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl bg-card px-4 py-3">
@@ -94,9 +78,8 @@ async function EventRecord({ params }: Props) {
   const until = row.ends_on && row.ends_on !== row.starts_on ? ` through ${longDay(row.ends_on)}` : "";
   const time = row.starts_at ? `${centralTime(row.starts_at)} Central` : row.kind === "deadline" || row.legal_basis || until ? "All day" : "Time not given by the source";
   const shareUrl = `${SITE_URL}/events/${row.id}`;
-  const bills = row.bills
-    .map((bill) => ({ bill, url: row.starts_on ? billUrl(bill, row.starts_on) : null }))
-    .filter((b): b is { bill: string; url: string } => b.url !== null);
+  // Every bill the source names is listed; it links to Congress.gov when its type is known.
+  const bills = row.bills.map((bill) => ({ bill, url: row.starts_on ? congressBillUrl(bill, row.starts_on) : null }));
 
   return (
     <article className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
@@ -185,10 +168,14 @@ async function EventRecord({ params }: Props) {
           <ul className="flex flex-wrap gap-3">
             {bills.map((b) => (
               <li key={b.bill}>
-                <a href={b.url} className="inline-flex min-h-11 items-center gap-1 font-semibold text-bluebonnet underline">
-                  {b.bill}
-                  <ExternalLink className="size-4" aria-hidden="true" />
-                </a>
+                {b.url ? (
+                  <a href={b.url} className="inline-flex min-h-11 items-center gap-1 font-semibold text-bluebonnet underline">
+                    {b.bill}
+                    <ExternalLink className="size-4" aria-hidden="true" />
+                  </a>
+                ) : (
+                  <span className="inline-flex min-h-11 items-center font-semibold">{b.bill}</span>
+                )}
               </li>
             ))}
           </ul>
