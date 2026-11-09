@@ -42,6 +42,7 @@ export function SiteNav({ people }: { people: Person[] }) {
   // While the header is still loading the list of officials, fall back to the slug in the URL.
   const current = slug ?? people[0]?.slug ?? pathname.match(/^\/politicians\/([^/]+)/)?.[1];
   const onAgents = pathname.startsWith("/agents");
+  const onEvents = pathname === "/events" || pathname.startsWith("/events/");
 
   const links = [
     {
@@ -49,19 +50,20 @@ export function SiteNav({ people }: { people: Person[] }) {
       label: "For the nerds",
       active: section === "nerds" || (!slug && /\/nerds\/?$/.test(pathname)),
     },
+    { href: "/events", label: "Events", active: onEvents },
     { href: "/agents", label: "For your agent", active: onAgents },
   ];
 
   return (
     <>
-      <nav aria-label="Primary" className="flex gap-1 overflow-x-auto text-sm sm:flex-1 sm:flex-wrap">
+      <nav aria-label="Primary" className="flex gap-0.5 overflow-x-auto text-sm sm:min-w-max sm:flex-1">
         {links.map((link) => (
           <Link
             key={link.label}
             href={link.href}
             aria-current={link.active ? "page" : undefined}
             className={cn(
-              "shrink-0 rounded-full px-3 py-2 font-semibold hover:bg-secondary",
+              "inline-flex min-h-11 shrink-0 items-center rounded-full px-2.5 font-semibold hover:bg-secondary",
               link.active && "bg-secondary underline decoration-2 underline-offset-4",
             )}
           >

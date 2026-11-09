@@ -7,7 +7,12 @@ import { allPages, congressBillRow, fecCycles, menuVotes, MAX_VOTES_PER_SYNC, ne
 import { executiveOrdersIn, GOVERNOR_REPORTS, governorActionDate, monthsSince, ordersPrefix, parseArchivePosts } from "../governor.ts";
 import { officeContext, parseJournalDays, positionOf, recordVotesInDay } from "../journal.ts";
 import { parseSenateRollCalls, presidingVote } from "../senate_journal.ts";
-import { centralDate, type Http, type Log, mergeLog, texasLegislature } from "../shared.ts";
+import { appearanceDraft, mobilizeEvents, mobilizeOrganization, squarespaceEvents, squarespacePast } from "../events_campaign.ts";
+import { clockTime, forOfficial, saveEvents, zonedTime } from "../events.ts";
+import { type LawKey, lawText, legalEvents, regularSession, secondTuesdayOfJanuary, verifiedLaws } from "../events_law.ts";
+import { floorDraft as senateFloorDraft, hearingDraft, parseFloorSchedule, parseSenateHearings, parseTentativeSchedule, senatorCommittees } from "../events_senate.ts";
+import { floorDraft, meetingDraft, memberCommittees, parseCalendarFeed, parseMeetingFeed } from "../events_texas.ts";
+import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature } from "../shared.ts";
 import { isStatement } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
 import { coverRow, filesForReport, partBuilder, reportCycle, summarize, tecReportUrl, type TecReport } from "../tec.ts";
@@ -396,4 +401,227 @@ Deno.test("Stages: logs merge, nested counts add up, and notes are not repeated"
   assertEquals(into.errors.length, 1);
   assertEquals(into.notes, ["n", "o"]);
   assertEquals(positionOf({ record: "1", question: "", result: null, bill: null, lists: { yea: ["Goodwin"] } }, "Goodwin"), "yea");
+});
+
+// --- G. Events (tx_upcoming_events). Every source on pages saved from it; TLO feeds with meetings in
+// them were saved by the Internet Archive during the 88th Legislature (the live feeds are empty
+// between sessions, as the 2026-11-09 copies show).
+
+const count = (text: string, re: RegExp) => [...text.matchAll(re)].length;
+
+Deno.test("G1: every House committee meeting in TLO's feed is read, with its date, time, room and committee code", async () => {
+  const xml = await fixture("tlo_rss_meetings_house_2023-03-27.xml");
+  const meetings = parseMeetingFeed(xml);
+  assertEquals(meetings.length, count(xml, /<item>/g));
+  assertEquals(meetings.length, 34);
+  assertEquals(meetings[0], {
+    session: "88R",
+    committeeCode: "C410",
+    committee: "Public Health",
+    date: "2023-03-27",
+    time: "08:00",
+    timeText: "8:00 AM",
+    location: "E2.036",
+    url: "https://capitol.texas.gov/tlodocs/88R/schedules/html/C4102023032708001.htm",
+    noticeId: "C4102023032708001",
+    cancelled: false,
+  });
+  // Every meeting's date in the title matches the date in the notice's address.
+  for (const m of meetings) assert(m.url.includes(m.date.replaceAll("-", "")), m.url);
+  // "2:30 PM or upon final adjourn." keeps its condition in the details; the clock time is 2:30 PM Central.
+  const ag = meetingDraft(meetings.find((m) => m.committeeCode === "C020" && m.date === "2023-03-27")!, "House");
+  assertEquals(ag.starts_at, "2023-03-27T19:30:00.000Z");
+  assert(ag.details!.includes("2:30 PM or upon final adjourn./recess"));
+  assertEquals(ag.title, "House Committee on Agriculture & Livestock");
+  assertEquals(ag.event_key, "tlo_hearing:88R:C020:2023-03-27:14301");
+  // The Senate feed has the same shape.
+  const senate = await fixture("tlo_rss_meetings_senate_2023-05-19.xml");
+  assertEquals(parseMeetingFeed(senate).length, count(senate, /<item>/g));
+  // The live feed between sessions says "No committee meetings scheduled." and yields none.
+  assertEquals(parseMeetingFeed(await fixture("tlo_rss_meetings_house_2026-11-09.xml")), []);
+});
+
+Deno.test("G1: committee membership comes from the member's TLO page, by committee code", async () => {
+  assertEquals(memberCommittees(await fixture("tlo_member_89_A3820.html")), [
+    { session: "89R", code: "C030", name: "Appropriations" },
+    { session: "89R", code: "C012", name: "Appropriations - S/C on Article III" },
+    { session: "89R", code: "C320", name: "Insurance" },
+  ]);
+  // Only meetings of those committees match: none of the 34 meetings on 2023-03-27 was Appropriations or Insurance.
+  const meetings = parseMeetingFeed(await fixture("tlo_rss_meetings_house_2023-03-27.xml"));
+  assertEquals(meetings.filter((m) => ["C030", "C012", "C320"].includes(m.committeeCode)).map((m) => `${m.committee} ${m.date}`), ["Insurance 2023-03-28"]);
+});
+
+Deno.test("G2: House and Senate floor calendars are read one event per chamber per day", async () => {
+  const house = await fixture("tlo_rss_calendars_house_2023-05-19.xml");
+  const days = parseCalendarFeed(house, "H");
+  assertEquals(days.map((d) => d.date), ["2023-05-18", "2023-05-19", "2023-05-20"]);
+  // Every document in the feed is kept with its day.
+  assertEquals(days.reduce((n, d) => n + d.documents.length, 0), count(house, /<item>/g));
+  const row = floorDraft(days[0]);
+  assertEquals(row.kind, "floor_vote");
+  assertEquals(row.source_url, "https://capitol.texas.gov/tlodocs/88R/calendars/html/H120230518.htm");
+  assertEquals(row.event_key, "tlo_calendar:88R:H:2023-05-18");
+  assertEquals(row.starts_at, undefined); // The calendar gives no time, so none is shown.
+  const senate = parseCalendarFeed(await fixture("tlo_rss_calendars_senate_2023-05-19.xml"), "S");
+  assertEquals(senate.map((d) => [d.date, d.documents.length]), [["2023-05-18", 6], ["2023-05-19", 2]]);
+  assertEquals(floorDraft(senate[0]).source_name, "Texas Legislature Online: Notice of Intent");
+  assertEquals(parseCalendarFeed(await fixture("tlo_rss_calendars_house_2026-11-09.xml"), "H"), []);
+});
+
+Deno.test("G3: the Senate floor schedule's next meeting is read, and Eastern time becomes Central", async () => {
+  const next = parseFloorSchedule(await fixture("senate_floor_schedule_2026-11-09.htm"))!;
+  assertEquals(next, { date: "2026-11-09", text: "Convene at 3:00 p.m.", time: "15:00", timeText: "3:00 p.m." });
+  const row = senateFloorDraft(next);
+  assertEquals(row.starts_at, "2026-11-09T20:00:00.000Z"); // 3:00 p.m. EST
+  assert(row.details!.includes("3:00 p.m. Eastern, 2:00 p.m. Central"));
+  assertEquals(parseFloorSchedule("<p>no schedule</p>"), null);
+});
+
+Deno.test("G3: the Senate's tentative schedule lists every non-legislative period", async () => {
+  const xml = await fixture("senate_2026_schedule.xml");
+  const periods = parseTentativeSchedule(xml);
+  assertEquals(periods.length, count(xml, /<beginDate>/g));
+  assertEquals(periods.find((p) => p.begin === "2026-08-10"), { begin: "2026-08-10", end: "2026-09-11", action: "State Work Period", note: "Labor Day - Sep 7" });
+});
+
+Deno.test("G4: Senate hearings are read from senate.gov, matched to a senator's committees by bioguide ID only", async () => {
+  const xml = await fixture("senate_hearings_2026-11-09.xml");
+  const hearings = parseSenateHearings(xml);
+  // Every <meeting> but the "No committee hearings scheduled" placeholder.
+  assertEquals(hearings.length, count(xml, /<meeting>/g) - 1);
+  const first = hearingDraft(hearings[0]);
+  assertEquals(first.starts_at, "2026-11-10T14:30:00.000Z"); // 9:30 a.m. Eastern
+  assertEquals(first.location, "SD-366, Washington, D.C.");
+  assert(first.details!.includes("Scheduled for 9:30 AM Eastern (8:30 a.m. Central)"));
+  const members = await fixture("senate_cvc_member_data_2026-11-09.xml");
+  const cornyn = senatorCommittees(members, "C001056")!;
+  assert(cornyn.some((c) => c.code === "SSFR00"));
+  const theirs = hearings.filter((h) => cornyn.some((c) => c.code === h.code));
+  assertEquals(theirs.map((h) => h.committee), ["Foreign Relations", "Finance", "Judiciary"]);
+  assertEquals(senatorCommittees(members, "T000000"), null); // An ID not on the list matches nobody.
+});
+
+Deno.test("G5: dates set by law are computed only from the law's own text", async () => {
+  const files: Record<LawKey, string> = {
+    convene: "law_GV.301.htm",
+    filing: "law_CN.3.htm",
+    length: "law_CN.3.htm",
+    veto: "law_CN.4.htm",
+    installed: "law_CN.4.htm",
+    ltGovernor: "law_CN.4.htm",
+    senateTerm: "law_senate_constitution.htm",
+  };
+  const texts: Partial<Record<LawKey, string>> = {};
+  for (const [key, file] of Object.entries(files)) texts[key as LawKey] = lawText(await fixture(file));
+  const verified = verifiedLaws(texts);
+  assertEquals(verified.size, 7);
+  const dates = (office: string, start: string) => legalEvents(office, "2026-11-09", verified, start).map((d) => [d.starts_on, d.legal_basis, d.event_key]);
+  assertEquals(dates("tx_house", "2027-01-12"), [
+    ["2027-01-12", "Tex. Gov't Code §301.001", "law:90R:convene"],
+    ["2027-03-12", "Tex. Const. art. 3, §5(b)", "law:90R:day60"],
+    ["2027-05-31", "Tex. Const. art. 3, §24(b)", "law:90R:day140"],
+  ]);
+  assertEquals(dates("governor", "2027-01-19"), [
+    ["2027-01-19", "Tex. Const. art. 4, §4", "law:90R:installed:governor"],
+    ["2027-06-20", "Tex. Const. art. 4, §14; Tex. Const. art. 3, §24(b)", "law:90R:veto_period"],
+  ]);
+  assertEquals(dates("tx_lt_governor", "2027-01-19").map((d) => d[0]), ["2027-01-12", "2027-03-12", "2027-05-31", "2027-01-19"]);
+  assertEquals(dates("us_senate", "2027-01-03"), [["2027-01-03", "U.S. Const. amend. XX, §1", "law:us_senate:term:2027-01-03"]]);
+  // Noon Central on convening day; noon Eastern for the Senate term.
+  assertEquals(legalEvents("tx_house", "2026-11-09", verified, "2027-01-12")[0].starts_at, "2027-01-12T18:00:00.000Z");
+  assertEquals(legalEvents("us_senate", "2026-11-09", verified, "2027-01-03")[0].starts_at, "2027-01-03T17:00:00.000Z");
+  // The 89th Legislature's published dates check the counting: convened 2025-01-14, 60th day 2025-03-14, 140th day 2025-06-02.
+  assertEquals(secondTuesdayOfJanuary(2025), "2025-01-14");
+  assertEquals(legalEvents("tx_house", "2025-01-01", verified, null).map((d) => d.starts_on), ["2025-01-14", "2025-03-14", "2025-06-02"]);
+  // After the veto period ends, the next session's dates are the upcoming ones.
+  assertEquals(regularSession("2027-06-20").convened, "2027-01-12");
+  assertEquals(regularSession("2027-06-21").convened, "2029-01-09");
+  // If the sentence a rule depends on changes, its dates are not loaded.
+  const changed = verifiedLaws({ ...texts, convene: texts.convene!.replace("second Tuesday", "third Tuesday") });
+  assertEquals(legalEvents("tx_house", "2026-11-09", changed, "2027-01-12"), []);
+});
+
+Deno.test("G6: a Squarespace events page is read as its own JSON; only upcoming events, and times to the minute", async () => {
+  const json = JSON.parse(await fixture("campaign_vikkigoodwin_events.json"));
+  assertEquals(squarespaceEvents(json, "https://www.vikkigoodwin.com"), []); // Nothing upcoming after the election.
+  const past = squarespacePast(json, "https://www.vikkigoodwin.com");
+  assertEquals(past.length, json.past.length);
+  assertEquals(past[0].title, "Election Night Party - Austin");
+  assertEquals(past[0].startsAt, "2026-11-04T00:30:00.000Z"); // 6:30 PM Central on November 3, as the page says.
+  assertEquals(past[0].location, "Hyatt Regency, 208 Barton Springs Road, Austin, Texas, 78704");
+  const row = appearanceDraft(past[0], "vikkigoodwin.com", "campaign:vikkigoodwin.com");
+  assertEquals([row.starts_on, row.kind, row.is_campaign, row.source_url], ["2026-11-03", "appearance", true, "https://www.vikkigoodwin.com/events/nov3"]);
+});
+
+Deno.test("G6: a Mobilize page keeps only events the campaign itself hosts", async () => {
+  const org = mobilizeOrganization(await fixture("mobilize_ginahinojosafortexasgovernor.html"));
+  assertEquals(org, 46544);
+  const json = JSON.parse(await fixture("mobilize_api_46544.json"));
+  assertEquals(json.data.length, 4);
+  // All four upcoming events on the campaign's page are hosted by party organizations, not the campaign.
+  assertEquals(mobilizeEvents(json, org!), []);
+  // The same events, read for the organization that hosts them, are one row per time slot.
+  const party = mobilizeEvents(json, 370);
+  assertEquals(party.length, json.data.filter((e: { sponsor: { id: number } }) => e.sponsor.id === 370).reduce((n: number, e: { timeslots: unknown[] }) => n + e.timeslots.length, 0));
+});
+
+Deno.test("G7: time helpers convert wall-clock times across daylight time", () => {
+  assertEquals(zonedTime("2027-01-12", "12:00", "America/Chicago"), "2027-01-12T18:00:00.000Z");
+  assertEquals(zonedTime("2027-07-12", "12:00", "America/Chicago"), "2027-07-12T17:00:00.000Z");
+  assertEquals(zonedTime("2026-11-10", "09:30", "America/New_York"), "2026-11-10T14:30:00.000Z");
+  assertEquals(clockTime("2:30 PM or upon final adjourn."), "14:30");
+  assertEquals(clockTime("12:00 p.m."), "12:00");
+  assertEquals(clockTime("12:15 AM"), "00:15");
+  assertEquals(clockTime("Upon adjournment"), null);
+});
+
+/** A stand-in for the tx_upcoming_events table, enough for saveEvents. */
+function fakeEventsDb(stored: Record<string, unknown>[]) {
+  const written: Record<string, unknown>[][] = [];
+  const db = {
+    from: () => ({
+      select: () => {
+        const chain = { eq: () => chain, like: () => chain, gte: () => Promise.resolve({ data: stored, error: null }) };
+        return chain;
+      },
+      upsert: (rows: Record<string, unknown>[]) => {
+        written.push(rows);
+        return Promise.resolve({ error: null });
+      },
+    }),
+  };
+  return { db, written };
+}
+
+Deno.test("G8: events refresh: a changed time is updated and marked changed, a vanished event is noted, not deleted", async () => {
+  const p = { id: "p1", slug: "x", name: "X" };
+  const base = forOfficial({ kind: "committee_hearing", title: "House Committee on Insurance", starts_on: "2027-03-02", starts_at: "2027-03-02T14:00:00.000Z", source_name: "TLO", source_url: "u", event_key: "tlo_hearing:90R:C320:2027-03-02:08001" }, p);
+  const gone = { ...base, external_id: "tlo_hearing:90R:C320:2027-03-09:08001:x", title: "House Committee on Insurance", starts_on: "2027-03-09" };
+  const { db, written } = fakeEventsDb([{ ...base, status: "scheduled" }, { ...gone, status: "scheduled" }]);
+  const log: Log = { counts: {}, errors: [], notes: [] };
+  const ctx = { db, log, now: new Date("2027-03-01T12:00:00Z") } as unknown as Ctx;
+  // Same row again: nothing is written.
+  await saveEvents(ctx, p, "TLO", "tlo_hearing:", [base], { from: "2027-03-01", complete: false });
+  assertEquals(written.length, 0);
+  // The time moved: written with status changed and updated_at.
+  await saveEvents(ctx, p, "TLO", "tlo_hearing:", [{ ...base, starts_at: "2027-03-02T15:30:00.000Z" }], { from: "2027-03-01", complete: true });
+  assertEquals(written[0][0].status, "changed");
+  assertEquals(written[0][0].updated_at, "2027-03-01T12:00:00.000Z");
+  // The 2027-03-09 meeting is no longer listed: noted, never deleted or marked cancelled.
+  assert(log.notes[0].includes("no longer listed (House Committee on Insurance, 2027-03-09)"));
+  assertEquals(written.flat().some((row) => row.external_id === gone.external_id), false);
+  // The source itself says cancelled: kept and marked cancelled.
+  await saveEvents(ctx, p, "TLO", "tlo_hearing:", [{ ...base, status: "cancelled" }], { from: "2027-03-01", complete: false });
+  assertEquals(written[1][0].status, "cancelled");
+  assertEquals(log.counts.events_changed, 2);
+});
+
+Deno.test("E2: every event source is in the registry for the offices it serves", () => {
+  const keys = (office: string) => sourcesFor(office).map((s) => s.key).filter((k) => k.startsWith("events_"));
+  assertEquals(keys("tx_house"), ["events_law", "events_tx_floor", "events_tx_hearings", "events_campaign"]);
+  assertEquals(keys("tx_lt_governor"), ["events_law", "events_tx_floor", "events_campaign"]);
+  assertEquals(keys("governor"), ["events_law", "events_campaign"]);
+  assertEquals(keys("us_senate"), ["events_law", "events_senate_floor", "events_senate_hearings", "events_campaign"]);
+  assertEquals(centralDate(new Date("2027-01-12T18:00:00Z")), "2027-01-12");
 });

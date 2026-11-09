@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><css_meetings_scheduled>
+  <meeting>
+    <cmte_code/>
+    <committee/>
+    <type/>
+    <date>09-NOV-2026</date>
+    <date_iso_8601>2026-11-09</date_iso_8601>
+    <day_of_week>Today</day_of_week>
+    <time>10:00:00</time>
+    <room/>
+    <matter>No committee hearings scheduled</matter>
+    <video_url/>
+    <senate_cable_channel/>
+  </meeting>
+  <meeting>
+    <identifier>338800</identifier>
+    <last_update>11-03-2026 05:22:18 PM</last_update>
+    <last_update_iso_8601>2026-11-03T17:22:18.000000Z-05:00</last_update_iso_8601>
+    <cmte_code>SSEG00</cmte_code>
+    <committee>Energy and Natural Resources</committee>
+    <type>Open Hearing</type>
+    <date>10-NOV-2026 09:30 AM</date>
+    <date_iso_8601>2026-11-10</date_iso_8601>
+    <day_of_week>Tuesday</day_of_week>
+    <time>09:30 AM</time>
+    <time_iso_8601>09:30:00</time_iso_8601>
+    <room>SD-366</room>
+    <video_url>https://www.senate.gov/isvp/?comm=energy&amp;filename=energy111026</video_url>
+    <senate_cable_channel>
+    </senate_cable_channel>
+    <Documents>
+      <AssociatedDocument congress="119" document_description="Dennis Kirk, of Virginia, to be Inspector General, Department of the Interior, vice Mark Lee Greenblatt." document_num="1256" document_prefix="PN"/>
+    </Documents>
+    <matter>Hearings to examine the nomination of Dennis Kirk, of Virginia, to be Inspector General, Department of the Interior.</matter>
+  </meeting>
+  <meeting>
+    <identifier>338806</identifier>
+    <last_update>11-03-2026 05:35:38 PM</last_update>
+    <last_update_iso_8601>2026-11-03T17:35:38.000000Z-05:00</last_update_iso_8601>
+    <cmte_code>SSFR00</cmte_code>
+    <committee>Foreign Relations</committee>
+    <type>Open Hearing</type>
+    <date>10-NOV-2026 10:00 AM</date>
+    <date_iso_8601>2026-11-10</date_iso_8601>
+    <day_of_week>Tuesday</day_of_week>
+    <time>10:00 AM</time>
+    <time_iso_8601>10:00:00</time_iso_8601>
+    <room>SD-419</room>
+    <video_url>https://www.senate.gov/isvp/?comm=foreign&amp;filename=foreign111026</video_url>
+    <senate_cable_channel>
+    </senate_cable_channel>
+    <Documents/>
+    <matter>Hearings to examine pending nominations.</matter>
+  </meeting>
+  <meeting>
+    <identifier>338801</identifier>
+    <last_update>11-03-2026 05:23:58 PM</last_update>
+    <last_update_iso_8601>2026-11-03T17:23:58.000000Z-05:00</last_update_iso_8601>
+    <cmte_code>SSHR00</cmte_code>
+    <committee>Health, Education, Labor, and Pensions</committee>
+    <type>Open Hearing</type>
+    <date>10-NOV-2026 10:00 AM</date>
+    <date_iso_8601>2026-11-10</date_iso_8601>
+    <day_of_week>Tuesday</day_of_week>
+    <time>10:00 AM</time>
+    <time_iso_8601>10:00:00</time_iso_8601>
+    <room>SD-430</room>
+    <video_url>https://www.senate.gov/isvp/?comm=help&amp;filename=help111026</video_url>
+    <senate_cable_channel>
+    </senate_cable_channel>
+    <Documents>
+      <AssociatedDocument congress="119" document_description="Catherine Eschbach, of Texas, to be General Counsel of the Equal Employment Opportunity Commission for a term of four years, vice Karla Ann Gilbride." document_num="1273" document_prefix="PN" partition="05"/>
+    </Documents>
+    <matter>Hearings to examine the nomination of Catherine Eschbach, of Texas, to be General Counsel of the Equal Employment Opportunity Commission.</matter>
+  </meeting>
+  <meeting>
+    <identifier>338804</identifier>
+    <last_update>11-03-2026 05:30:46 PM</last_update>
+    <last_update_iso_8601>2026-11-03T17:30:46.000000Z-05:00</last_update_iso_8601>
+    <cmte_code>SSAF00</cmte_code>
+    <committee>Agriculture, Nutrition, and Forestry</committee>
+    <type>Open Hearing</type>
+    <date>10-NOV-2026 10:30 AM</date>
+    <date_iso_8601>2026-11-10</date_iso_8601>
+    <day_of_week>Tuesday</day_of_week>
+    <time>10:30 AM</time>
+    <time_iso_8601>10:30:00</time_iso_8601>
+    <room>SD-106</room>
+    <video_url>https://www.senate.gov/isvp/?comm=ag&amp;filename=ag111026</video_url>
+    <senate_cable_channel>
+    </senate_cable_channel>
+    <Documents/>
+    <matter>Hearings to examine pending nominations.</matter>
+  </meeting>
+  <meeting>
+    <identifier>338803</identifier>
+    <last_update>11-03-2026 05:29:54 PM</last_update>
+    <last_update_iso_8601>2026-11-03T17:29:54.000000Z-05:00</last_update_iso_8601>
+    <cmte_code>SSCM00</cmte_code>
+    <committee>Commerce, Science, and Transportation</committee>
+    <type>Open Hearing</type>
+    <date>10-NOV-2026 10:30 AM</date>
+    <date_iso_8601>2026-11-10</date_iso_8601>
+    <day_of_week>Tuesday</day_of_week>
+    <time>10:30 AM</time>
+    <time_iso_8601>10:30:00</time_iso_8601>
+    <room>SR253</room>
+    <video_url>https://www.senate.gov/isvp/?comm=commerce&amp;filename=commerce111026</video_url>
+    <senate_cable_channel>
+    </senate_cable_channel>
+    <Documents>
+      <AssociatedDocument congress="119" document_description="Leslie Becera, of Virginia, to be an Assistant Secretary of Transportation, vice Mohsin Raza Syed." document_num="1255" document_prefix="PN" partition="01"/>
+      <AssociatedDocument congress="119" document_description="Danielle Thumann Severs, of North Carolina, to be a Member of the Federal Communications Commission for a term of five years from July 1, 2024, vice Nathan A. Simington, term expired." document_num="1255" document_prefix="PN" partition="18"/>
+      <AssociatedDocument congress="119" document_description="Joshua Shoemaker, of Virginia, to be Chief Financial Officer, National Aeronautics and Space Administration, vice Margaret Vo Schaus, resigned." document_num="1273" document_prefix="PN" partition="20"/>
+      <AssociatedDocument congress="119" document_description="Robert Steinau, of Maryland, to be Inspector General, National Aeronautics and Space Administration, vice Paul K. Martin." document_num="1367" document_prefix="PN" partition="07"/>
+    </Documents>
+    <matter>Hearings to examine the nominations of Leslie Becera, of Virginia, to be an Assistant Secretary of Transportation, Danielle Thumann Severs, of North Carolina, to be a Member of the Federal Communications Commission, and Joshua Shoemaker, of Virginia, to be Chief Financial Officer, and Robert Steinau, of Maryland, to be Inspector General, both of the National Aeronautics and Space Administration.</matter>
+  </meeting>
+  <meeting>
+    <identifier>338802</identifier>
+    <last_update>11-03-2026 05:25:58 PM</last_update>
+    <last_update_iso_8601>2026-11-03T17:25:58.000000Z-05:00</last_update_iso_8601>
+    <cmte_code>SSEV00</cmte_code>
+    <committee>Environment and Public Works</committee>
+    <type>Open Hearing</type>
+    <date>10-NOV-2026 10:30 AM</date>
+    <date_iso_8601>2026-11-10</date_iso_8601>
+    <day_of_week>Tuesday</day_of_week>
+    <time>10:30 AM</time>
+    <time_iso_8601>10:30:00</time_iso_8601>
+    <room>SD-406</room>
+    <video_url>https://www.senate.gov/isvp/?comm=epw&amp;filename=epw111026</video_url>
+    <senate_cable_channel>
+    </senate_cable_channel>
+    <Documents>
+      <AssociatedDocument congress="119" document_description="Justin Schwab, of the District of Columbia, to be an Assistant Administrator of the Environmental Protection Agency, vice Aaron Szabo." document_num="1366" document_prefix="PN" partition="05"/>
+    </Documents>
+    <matter>Hearings to examine the nomination of Justin Schwab, of the District of Columbia, to be an Assistant Administrator of the Environmental Protection Agency.</matter>
+  </meeting>
+  <meeting>
+    <identifier>338805</identifier>
+    <last_update>11-03-2026 05:34:17 PM</last_update>
+    <last_update_iso_8601>2026-11-03T17:34:17.000000Z-05:00</last_update_iso_8601>
+    <cmte_code>SSFI00</cmte_code>
+    <committee>Finance</committee>
+    <type>Open Hearing</type>
+    <date>10-NOV-2026 11:00 AM</date>
+    <date_iso_8601>2026-11-10</date_iso_8601>
+    <day_of_week>Tuesday</day_of_week>
+    <time>11:00 AM</time>
+    <time_iso_8601>11:00:00</time_iso_8601>
+    <room>SD-215</room>
+    <video_url>https://www.senate.gov/isvp/?comm=finance&amp;filename=finance111026</video_url>
+    <senate_cable_channel>
+    </senate_cable_channel>
+    <Documents>
+      <AssociatedDocument congress="119" document_description="Christopher Abbott, of Virginia, to be an Assistant Secretary of Commerce, vice Lisa W. Wang, resigned." document_num="1273" document_prefix="PN" partition="01"/>
+      <AssociatedDocument congress="119" document_description="Francis Browne, of the District of Columbia, to be an Under Secretary of the Treasury, vice Jonathan McKernan." document_num="1273" document_prefix="PN" partition="03"/>
+      <AssociatedDocument congress="119" document_description="Robert Stebbins, of New York, to be General Counsel for the Department of the Treasury, vice Brian Morrissey, Jr., resigned." document_num="1273" document_prefix="PN" partition="21"/>
+    </Documents>
+    <matter>Hearings to examine the nominations of Francis Browne, of the District of Columbia, to be an Under Secretary, and Robert Stebbins, of New York, to be General Counsel, both of the Department of the Treasury, and Christopher Abbott, of Virginia, to be an Assistant Secretary of Commerce.</matter>
+  </meeting>
+  <meeting>
+    <identifier>338807</identifier>
+    <last_update>11-04-2026 10:48:29 AM</last_update>
+    <last_update_iso_8601>2026-11-04T10:48:29.000000Z-05:00</last_update_iso_8601>
+    <cmte_code>SSJU00</cmte_code>
+    <committee>Judiciary</committee>
+    <type>Open Business Meeting</type>
+    <date>10-NOV-2026 11:00 AM</date>
+    <date_iso_8601>2026-11-10</date_iso_8601>
+    <day_of_week>Tuesday</day_of_week>
+    <time>11:00 AM</time>
+    <time_iso_8601>11:00:00</time_iso_8601>
+    <room>SD-562</room>
+    <video_url>https://www.senate.gov/isvp/?comm=judiciary&amp;filename=judiciary111026</video_url>
+    <senate_cable_channel>
+    </senate_cable_channel>
+    <Documents>
+      <AssociatedDocument congress="119" document_description="Daniel Lewis Ballou, of Kentucky, to be United States District Judge for the Eastern District of Kentucky, vice Gregory F. Van Tatenhove, retired." document_num="1272" document_prefix="PN" partition="03"/>
+      <AssociatedDocument congress="119" document_description="Richard Wesley Bennett, of Texas, to be United States District Judge for the Southern District of Texas, vice Andrew S. Hanen, retired." document_num="1272" document_prefix="PN" partition="04"/>
+      <AssociatedDocument congress="119" document_description="Courtney Leigh Coker, of Texas, to be United States District Judge for the Northern District of Texas, vice David C. Godbey, retired." document_num="1272" document_prefix="PN" partition="05"/>
+      <AssociatedDocument congress="119" document_description="Trevor Scott Pemberton, of Oklahoma, to be United States District Judge for the Northern District of Oklahoma, vice Gregory Kent Frizzell, retired." document_num="1272" document_prefix="PN" partition="11"/>
+      <AssociatedDocument congress="119" document_description="Kyle Frederick Reardon, of Alaska, to be United States District Judge for the District of Alaska, vice Joshua M. Kindred, resigned." document_num="1272" document_prefix="PN" partition="13"/>
+      <AssociatedDocument congress="119" document_description="Zachary Paul West, of Oklahoma, to be United States District Judge for the Eastern District of Oklahoma, vice Ronald A. White, retired." document_num="1272" document_prefix="PN" partition="16"/>
+      <AssociatedDocument congress="119" document_description="A bill to protect the right to the free exercise of religion." document_num="5289" document_prefix="SN"/>
+    </Documents>
+    <matter>Business meeting to consider S.5289, to protect the right to the free exercise of religion, and the nominations of Daniel Lewis Ballou, to be United States District Judge for the Eastern District of Kentucky, Richard Wesley Bennett, to be United States District Judge for the Southern District of Texas, Courtney Leigh Coker, to be United States District Judge for the Northern District of Texas, Trevor Scott Pemberton, to be United States District Judge for the Northern District of Oklahoma, Kyle Frederick Reardon, to be United States District Judge for the District of Alaska, and Zachary Paul West, to be United States District Judge for the Eastern District of Oklahoma; to be immediately followed by a hearing to consider pending nominations.</matter>
+  </meeting>
+</css_meetings_scheduled>

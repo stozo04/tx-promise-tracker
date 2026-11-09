@@ -32,6 +32,8 @@ export type Politician = {
   portrait_url?: string | null;
   portrait_credit?: string | null;
   portrait_source_url?: string | null;
+  /** The campaign's own events page, linked from its site. Sync reads appearances from it. */
+  campaign_events_url?: string | null;
   /** Campaign pages outside the main sitemap (petition subdomains) that Sync reads for topics. */
   campaign_watch_urls?: string[];
   status: string;
@@ -152,16 +154,39 @@ export type TopicFindingRow = {
   status: "new" | "promoted" | "dismissed";
 };
 
+export const EVENT_KINDS = ["session_day", "floor_vote", "committee_hearing", "deadline", "appearance"] as const;
+export type EventKind = (typeof EVENT_KINDS)[number];
+
+/** One official's row of one event. Rows of the same event share `event_key`. */
 export type UpcomingEventRow = {
   id: string;
   politician_id: string;
+  kind: EventKind;
   title: string;
   starts_on: string | null;
+  ends_on: string | null;
+  /** Null when the source gives no time. */
+  starts_at: string | null;
+  time_zone: string;
   when_label: string | null;
+  location: string | null;
+  /** The source's own description or agenda. */
+  details: string | null;
+  /** Who holds it: "Texas House", "Senate Committee on Finance". */
+  body: string | null;
+  /** For a date the law sets: the citation, its text, and what it was computed from. */
+  legal_basis: string | null;
+  legal_url: string | null;
+  computed_from: string | null;
+  event_key: string | null;
+  is_campaign: boolean;
+  bills: string[];
+  status: "scheduled" | "changed" | "cancelled" | "held";
   source_name: string;
   source_url: string;
   external_id: string;
   created_at: string;
+  updated_at: string | null;
 };
 
 export type ContributionRow = {

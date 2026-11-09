@@ -1,0 +1,218 @@
+
+
+<!DOCTYPE html>
+<html lang="en-US">
+	<head>
+		<title id="pageTitle">Member Information | Texas Legislature Online</title>
+		
+<meta charset="UTF-8" content=""/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>		
+<link rel="Shortcut Icon" type="image/x-icon" href="/images/favicon.ico" />			
+<link rel="stylesheet" href="/stylesheets/W3C/w3.css"/>     
+<link rel="stylesheet" href="/stylesheets/tlo.css"/>     
+<link href="/stylesheets/sideBarMenu.css" type="text/css" rel="stylesheet"/>	
+<script type="text/javascript" src="/scripts/BillNumber.js"></script>
+
+
+
+
+	</head>
+	<body id="house">
+
+		
+
+<a href="#maincontent" class="skip-main">Skip to main content</a>
+
+<a name="top"></a>
+
+<header role="banner">
+<div class="w3-top">
+
+  <div class="w3-bar w3-theme w3-top w3-left-align w3-large">
+      <div class="header">
+          <a href="/Home.aspx" aria-label="Home"><img id="usrHeader_imgHeader" class="capImage" Width="162" Height="60" src="../Images/capitolLarge.jpg" alt="Texas Capitol" border="0" /></a>
+            <div id="desc">
+			<span class="applicationName"><span id="usrHeader_lblApplicationName" style="display:inline-block;"><font color="White">89th Legislature Second Called Session</font></span></span><br/>
+			<span class="pageDescription"><span id="usrHeader_lblPageTitle" style="display:inline-block;"><b><font color="White">Texas Legislature Online</font></b></span></span>
+          </div>
+          <div>              
+             <form method="post" aria-label="Search" role="search" name="search" action="/Search/HeaderSearch.aspx" class="search-form w3-hide-small w3-hide-medium" role="search">
+                  <label class="title" for="cboSearchLegSess">Search:</label>
+                  <select id="cboSearchLegSess" name="legSess" CssClass="cboLegSess" alt="Specify search legislative session"><option  value="90R">90(R)</option><option selected="selected" value="892">89(2)</option><option  value="891">89(1)</option><option  value="89R">89(R)</option><option  value="884">88(4)</option><option  value="883">88(3)</option><option  value="882">88(2)</option><option  value="881">88(1)</option><option  value="88R">88(R)</option><option  value="873">87(3)</option><option  value="872">87(2)</option><option  value="871">87(1)</option><option  value="87R">87(R)</option><option  value="86R">86(R)</option><option  value="851">85(1)</option><option  value="85R">85(R)</option><option  value="84R">84(R)</option><option  value="833">83(3)</option><option  value="832">83(2)</option><option  value="831">83(1)</option><option  value="83R">83(R)</option><option  value="821">82(1)</option><option  value="82R">82(R)</option><option  value="811">81(1)</option><option  value="81R">81(R)</option><option  value="80R">80(R)</option><option  value="793">79(3)</option><option  value="792">79(2)</option><option  value="791">79(1)</option><option  value="79R">79(R)</option><option  value="784">78(4)</option><option  value="783">78(3)</option><option  value="782">78(2)</option><option  value="781">78(1)</option><option  value="78R">78(R)</option><option  value="77R">77(R)</option><option  value="76R">76(R)</option><option  value="75R">75(R)</option><option  value="74R">74(R)</option><option  value="73R">73(R)</option><option  value="724">72(4)</option><option  value="723">72(3)</option><option  value="722">72(2)</option><option  value="721">72(1)</option><option  value="72R">72(R)</option><option  value="716">71(6)</option><option  value="715">71(5)</option><option  value="714">71(4)</option><option  value="713">71(3)</option><option  value="712">71(2)</option><option  value="711">71(1)</option><option  value="71R">71(R)</option></select>
+                  <label id="txtQueryLabel" for="txtQuery">-</label>
+                  <input type="text" id="txtQuery" name="query" style="width:160px" placeholder="Bill lookup or text search" alt="Specify search bill number or text" maxlength="30" />
+                  <button type="submit" id="btnSubmitSearch" class="search-submit">Go</button>
+              </form>
+          </div>
+          <div class="divider" style="float:left;height:1px"><p></p></div>
+      </div>   
+  </div>
+</div>
+</header>
+
+		
+
+<!-- Navbar -->
+<nav role="navigation" aria-label="site navigation">
+<div class="w3-middle navBarLinks">
+  <div class="w3-bar w3-theme w3-left-align w3-large">
+    <a class="w3-bar-item w3-button w3-right w3-hide-large w3-hover-black w3-large" href="javascript:void(0)" onclick="w3_open()" aria-description="Open Menu" aria-label="Open Menu"><img src="/images/menu.svg" aria-hidden="true" focusable="false" alt="Menu icon" /></a>
+    <a href="/Home.aspx" class="nav-home w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Home</a>
+    <a href="/MnuMyTLO.aspx" class="nav-mytlo w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">My TLO</a>
+    <a href="/MnuHouse.aspx" class="nav-house w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">House</a>
+    <a href="/MnuSenate.aspx" class="nav-senate w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Senate</a>
+    <a href="/MnuLegislation.aspx" class="nav-billlookup w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Legislation</a>
+    <a href="/MnuSearch.aspx" class="nav-search w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Search</a>
+    <a href="/MnuCommittees.aspx" class="nav-committees w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Committees</a>
+    <a href="/MnuCalendars.aspx" class="nav-calendars w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Calendars</a>
+    
+    <div class="w3-hide-small w3-hide-medium" style="float:right; padding: 5px 5px 0 0">
+    <a href="https://capitol.texas.gov/tlodocs/webhelp/tlo.htm#t=default_topic.htm">Help</a> <span aria-hidden="true">|</span>
+    <a href="/resources/FAQ.aspx" title="Frequently asked questions">FAQ</a> <span aria-hidden="true">|</span>
+    <a href="/resources/siteMap.aspx">Site Map</a> <span aria-hidden="true">|</span>
+    <a href="/resources/contactText.aspx">Contact</a> <span aria-hidden="true">|</span>
+    
+        <a href="/MyTLO/Login/login.aspx?ReturnUrl=/Members/MemberInfo.aspx?Leg=89&Chamber=H&Code=A3820">Login</a>
+        
+  </div>
+    </div>
+</div>
+</nav>
+
+<div id="tloSidebar" style="display: none;">
+<nav aria-description="site navigation" class="w3-sidebar w3-bar-block w3-collapse w3-large w3-theme-l5 w3-animate-left" id="mySidebar">
+  <a href="javascript:void(0)" onclick="w3_close()" class="w3-right w3-xlarge w3-padding-large w3-hover-black w3-hide-large" title="Close Menu" aria-description="Close Menu" arial-label="Close Menu">
+      <img src="/images/close_menu.svg" aria-hidden="true" focusable="false" alt="Menu icon" />
+  </a>
+  <div class="w3-bar-item"><b>Menu</b></div>
+  <ul class="w3-bar-items">
+  <li><a class="w3-button" href="/Home.aspx">Home</a></li>
+  <li><a class="w3-button" href="/MnuMyTLO.aspx">My TLO</a></li>
+  <li><a class="w3-button" href="/MnuHouse.aspx">House</a></li>
+  <li><a class="w3-button" href="/MnuSenate.aspx">Senate</a></li>
+  <li><a class="w3-button" href="/MnuLegislation.aspx">Legislation</a></li>
+  <li><a class="w3-button" href="/MnuSearch.aspx">Search</a></li>
+  <li><a class="w3-button" href="/MnuCommittees.aspx">Committees</a></li>
+  <li><a class="w3-button" href="/MnuCalendars.aspx">Calendars</a></li>
+  </ul>
+  <p></p>
+    <label for="cboSearchLegSessMobile" style="padding-left: 16px;" aria-description="Specify search legislative session">Search:</label>
+    <br />
+  <form method="post" name="search" action="/Search/HeaderSearch.aspx" style="padding-left: 16px">
+    <select id="cboSearchLegSessMobile" name="legSess" CssClass="cboLegSess"><option  value="90R">90(R)</option><option selected="selected" value="892">89(2)</option><option  value="891">89(1)</option><option  value="89R">89(R)</option><option  value="884">88(4)</option><option  value="883">88(3)</option><option  value="882">88(2)</option><option  value="881">88(1)</option><option  value="88R">88(R)</option><option  value="873">87(3)</option><option  value="872">87(2)</option><option  value="871">87(1)</option><option  value="87R">87(R)</option><option  value="86R">86(R)</option><option  value="851">85(1)</option><option  value="85R">85(R)</option><option  value="84R">84(R)</option><option  value="833">83(3)</option><option  value="832">83(2)</option><option  value="831">83(1)</option><option  value="83R">83(R)</option><option  value="821">82(1)</option><option  value="82R">82(R)</option><option  value="811">81(1)</option><option  value="81R">81(R)</option><option  value="80R">80(R)</option><option  value="793">79(3)</option><option  value="792">79(2)</option><option  value="791">79(1)</option><option  value="79R">79(R)</option><option  value="784">78(4)</option><option  value="783">78(3)</option><option  value="782">78(2)</option><option  value="781">78(1)</option><option  value="78R">78(R)</option><option  value="77R">77(R)</option><option  value="76R">76(R)</option><option  value="75R">75(R)</option><option  value="74R">74(R)</option><option  value="73R">73(R)</option><option  value="724">72(4)</option><option  value="723">72(3)</option><option  value="722">72(2)</option><option  value="721">72(1)</option><option  value="72R">72(R)</option><option  value="716">71(6)</option><option  value="715">71(5)</option><option  value="714">71(4)</option><option  value="713">71(3)</option><option  value="712">71(2)</option><option  value="711">71(1)</option><option  value="71R">71(R)</option></select>
+    <label id="txtQueryMobileLabel" for="txtQueryMobile" aria-description="Specify search bill number or text">-</label>
+    <input type="text" id="txtQueryMobile" name="query" style="width:130px" placeholder="Bill or text search" maxlength="30" />
+      <br />
+      <br />
+    <button type="submit" id="btnSubmitSearchMobile" class="search-submit">Go</button>
+  </form>
+    <br/>
+    <div style="margin-left: 16px">
+    <a href="https://capitol.texas.gov/tlodocs/webhelp/tlo.htm#t=default_topic.htm">Help</a> <span aria-hidden="true">|</span>
+    <a href="/resources/FAQ.aspx" title="Frequently asked questions">FAQ</a> <span aria-hidden="true">|</span>
+    <a href="/resources/siteMap.aspx">Site Map</a> <span aria-hidden="true">|</span>
+    <a href="/resources/contactText.aspx">Contact</a> <span aria-hidden="true">|</span>
+
+    
+        <a href="/MyTLO/Login/login.aspx?ReturnUrl=/Members/MemberInfo.aspx?Leg=89&Chamber=H&Code=A3820">Login</a>
+      
+    </div>
+</nav>
+</div>
+
+		<main class="w3-main" role="main" id="maincontent">
+		<div class="w3-row">
+		<div class="w3-container">
+				<form name="Form1" method="post" action="./MemberInfo.aspx?Leg=89&amp;Chamber=H&amp;Code=A3820" id="Form1">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwUJOTUxMjEwNDg1ZGStXvrUYC95iVUaNTClojUUfHyQDg==" />
+
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="B90E096B" />
+					<h1>Information for Rep. Vikki Goodwin</h1>
+
+					<p><strong>Legislature:</strong>&nbsp;<span id="lblLegislature">89th Legislature</span>
+					</p>
+					<div id="contactInfo">
+						<h2>Contact Information</h2>
+						
+						<a id="lnkHomePage" href="https://www.house.texas.gov/members/member-page/?district=47">Visit Home Page on Texas House of Representatives Website</a>
+						<p></p>
+						<strong>District:</strong>&nbsp;<span id="lblDistrict">47</span>
+						<p></p>
+						
+						
+						
+					</div>	
+
+					<div id="committeeAssignments">
+						<p></p>
+						<h2>Committee Assignments</h2>
+
+						<P><strong>Committees</strong><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a href="../Committees/MembershipCmte.aspx?LegSess=89R&CmteCode=C030">Appropriations</a> <br/>&nbsp;&nbsp;&nbsp;&nbsp;<a href="../Committees/MembershipCmte.aspx?LegSess=89R&CmteCode=C012">Appropriations - S/C on Article III</a> <br/>&nbsp;&nbsp;&nbsp;&nbsp;<a href="../Committees/MembershipCmte.aspx?LegSess=89R&CmteCode=C320">Insurance</a> <br/></P>
+		
+						
+
+						<p></p>
+					</div>
+
+					<div id="legislativeInformation">
+						<p></p>
+						<h2>Legislative Information</h2>
+
+						<p><strong>89(R) - 2025</strong><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=89R&ID=author&Code=A3820" aria-label="Bills authored report">Bills Authored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=89R&ID=sponsor&Code=A3820" aria-label="Bills sponsored report">Bills Sponsored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=89R&ID=coauthor&Code=A3820" aria-label="Bills coauthored report">Bills Coauthored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=89R&ID=cosponsor&Code=A3820" aria-label="Bills cosponsored report">Bills Cosponsored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../Search/AmendSearchResults.aspx?Leg=89&Sess=R&Bill=&Hse=1&Sen=1&Auth=A3820&2nd=1&3rd=1&Type=All&Action=All&Dateon=&Srch=simple&All=&Any=&Xact=&Xclude=&Custom=" aria-label="Amendments authored">Amendments Authored</a></p><p><strong>89(1) - 2025</strong><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=891&ID=author&Code=A3820" aria-label="Bills authored report">Bills Authored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=891&ID=sponsor&Code=A3820" aria-label="Bills sponsored report">Bills Sponsored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=891&ID=coauthor&Code=A3820" aria-label="Bills coauthored report">Bills Coauthored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=891&ID=cosponsor&Code=A3820" aria-label="Bills cosponsored report">Bills Cosponsored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../Search/AmendSearchResults.aspx?Leg=89&Sess=1&Bill=&Hse=1&Sen=1&Auth=A3820&2nd=1&3rd=1&Type=All&Action=All&Dateon=&Srch=simple&All=&Any=&Xact=&Xclude=&Custom=" aria-label="Amendments authored">Amendments Authored</a></p><p><strong>89(2) - 2025</strong><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=892&ID=author&Code=A3820" aria-label="Bills authored report">Bills Authored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=892&ID=sponsor&Code=A3820" aria-label="Bills sponsored report">Bills Sponsored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=892&ID=coauthor&Code=A3820" aria-label="Bills coauthored report">Bills Coauthored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../reports/report.aspx?LegSess=892&ID=cosponsor&Code=A3820" aria-label="Bills cosponsored report">Bills Cosponsored</a><br/>&nbsp;&nbsp;&nbsp;&nbsp;<a target="_self" href="../Search/AmendSearchResults.aspx?Leg=89&Sess=2&Bill=&Hse=1&Sen=1&Auth=A3820&2nd=1&3rd=1&Type=All&Action=All&Dateon=&Srch=simple&All=&Any=&Xact=&Xclude=&Custom=" aria-label="Amendments authored">Amendments Authored</a></p>
+
+					</div>
+				</form>
+			</div>
+        </div>
+		</main>
+		
+<p></p>
+<footer class="l-footer" aria-label="Footer navigation">
+  		<div class="row">
+  			<div style="text-align:center">
+  				<ul class="footer">
+                <li><a href="/Home.aspx" aria-label="Home footer menu item">Home</a></li>
+                <li><a href="/MnuMyTLO.aspx" aria-label="My TLO footer menu item">My TLO</a></li>
+                <li><a href="/MnuHouse.aspx" aria-label="House footer menu item">House</a></li>
+                <li><a href="/MnuSenate.aspx" aria-label="Senate footer menu item">Senate</a></li>
+                <li><a href="/MnuLegislation.aspx" aria-label="Legislation footer menu item">Legislation</a></li>
+                <li><a href="/MnuSearch.aspx" aria-label="Search footer menu item">Search</a></li>
+                <li><a href="/MnuCommittees.aspx" aria-label="Committees footer menu item">Committees</a></li>
+                <li><a href="/MnuCalendars.aspx" aria-label="Calendars footer menu item">Calendars</a></li>
+                <li><a href="#top">Top</a></li>
+  				</ul>
+  			</div>
+
+  			<div class="columns">
+  				<hr>
+  			</div>
+  		</div>
+  		<div class="row">
+  			<div style="text-align:center">
+                <ul class="footer">
+				
+              <li><a href="/resources/policies.aspx">Policies</a></li>				
+              <li><a href="/resources/accessibility.aspx">Accessibility</a></li>   
+			  			  			                                           
+  			  </ul>
+  			</div>
+  		</div>
+</footer>
+
+
+
+
+<script src="/scripts/sideMenu.js" type="text/javascript"></script>
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-0PD42KC8G7"></script>
+
+<script  type="text/javascript">
+window.dataLayer = window.dataLayer || [];
+function gtag() { dataLayer.push(arguments); }
+gtag('js', new Date());
+gtag('config', 'G-0PD42KC8G7');
+</script>
+
+
+	</body>
+</html>

@@ -1,5 +1,9 @@
 // The one list of every source Sync knows about, per office. The run reads it to decide what to
 // call, and the run notes read it to say what is not automated, so the two can never disagree.
+import { campaignAppearances } from "./events_campaign.ts";
+import { legalDates } from "./events_law.ts";
+import { senateFloor, senateHearings } from "./events_senate.ts";
+import { texasFloor, texasHearings } from "./events_texas.ts";
 import { congress, fec, senateVotes } from "./federal.ts";
 import { governorActions } from "./governor.ts";
 import { senateJournal } from "./senate_journal.ts";
@@ -27,6 +31,13 @@ export const SOURCES: SourceDef[] = [
   { key: "governor", label: "Texas Legislature Online governor actions and Office of the Governor executive orders", offices: ["governor"], run: governorActions },
   { key: "senate_journal", label: "the Texas Senate Journal", offices: ["tx_lt_governor"], run: senateJournal },
   { key: "tec", label: "the Texas Ethics Commission", offices: ["governor", "tx_lt_governor", "tx_house"], run: tec },
+  // Events (tx_upcoming_events). One source per kind of event.
+  { key: "events_law", label: "dates set by law (statutes.capitol.texas.gov, senate.gov)", offices: ["us_senate", "governor", "tx_lt_governor", "tx_house"], run: legalDates },
+  { key: "events_tx_floor", label: "Texas Legislature Online House and Senate floor calendars", offices: ["tx_house", "tx_lt_governor"], run: texasFloor },
+  { key: "events_tx_hearings", label: "Texas Legislature Online committee meetings", offices: ["tx_house"], run: texasHearings },
+  { key: "events_senate_floor", label: "the U.S. Senate floor schedule and tentative schedule", offices: ["us_senate"], run: senateFloor },
+  { key: "events_senate_hearings", label: "U.S. Senate committee hearings", offices: ["us_senate"], run: senateHearings },
+  { key: "events_campaign", label: "campaign events pages", offices: ["us_senate", "governor", "tx_lt_governor", "tx_house"], run: campaignAppearances },
 ];
 
 export function sourcesFor(office: string, sources = SOURCES) {

@@ -3,19 +3,23 @@
 //
 //   deno run --allow-net --allow-env=DATA_GOV_KEY --node-modules-dir=none scripts/sync-live-check.ts [section ...]
 //
-// Sections: house tlo governor senate congress fec tec (all by default). Congress.gov and FEC use
+// Sections: house tlo governor senate congress fec tec events (all by default). Congress.gov and FEC use
 // api.data.gov's public DEMO_KEY unless DATA_GOV_KEY is set, so keep repeat runs light.
+import { mobilizeEvents, mobilizeOrganization, squarespaceEvents, squarespacePast } from "../supabase/functions/tx_sync/events_campaign.ts";
+import { LAWS, type LawKey, lawText, legalEvents, verifiedLaws } from "../supabase/functions/tx_sync/events_law.ts";
+import { parseFloorSchedule, parseSenateHearings, parseTentativeSchedule, SENATE_FLOOR_SCHEDULE, SENATE_HEARINGS, SENATE_MEMBERS, senateScheduleUrl, senatorCommittees } from "../supabase/functions/tx_sync/events_senate.ts";
+import { memberCommittees, parseCalendarFeed, parseMeetingFeed, TLO_RSS } from "../supabase/functions/tx_sync/events_texas.ts";
 import { allPages, menuVotes, senateVoteRow } from "../supabase/functions/tx_sync/federal.ts";
 import { executiveOrdersIn, GOVERNOR_REPORTS, governorActionDate, parseArchivePosts } from "../supabase/functions/tx_sync/governor.ts";
 import { JOURNAL_API, parseJournalDays, positionOf, recordVotesInDay } from "../supabase/functions/tx_sync/journal.ts";
 import { parseSenateRollCalls, presidingVote } from "../supabase/functions/tx_sync/senate_journal.ts";
-import { http } from "../supabase/functions/tx_sync/shared.ts";
+import { centralDate, http } from "../supabase/functions/tx_sync/shared.ts";
 import { coverRow, partBuilder } from "../supabase/functions/tx_sync/tec.ts";
 import { csvReader, entryText, grepLines, listZip } from "../supabase/functions/tx_sync/tec_zip.ts";
 import { parseAuthorReport, parseReportRows } from "../supabase/functions/tx_sync/texas.ts";
 
 const KEY = `api_key=${Deno.env.get("DATA_GOV_KEY") ?? "DEMO_KEY"}`;
-const wanted = new Set(Deno.args.length ? Deno.args : ["house", "tlo", "governor", "senate", "congress", "fec", "tec"]);
+const wanted = new Set(Deno.args.length ? Deno.args : ["house", "tlo", "governor", "senate", "congress", "fec", "tec", "events"]);
 
 async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>) {
   const out: R[] = new Array(items.length);
@@ -151,4 +155,55 @@ if (wanted.has("tec")) {
     console.log(`B1 ${last.name} report ${part.report_id} (filer ${part.filer_ident}): ${part.rows} rows, itemized ${part.itemized_total} (cover sheet: ${itemizedOnCover}), TX ${part.in_state_total}`);
   }
   console.log(`B1 ${last.name} (${(last.size / 1e6).toFixed(0)} MB) read in ${Math.round(performance.now() - t)} ms`);
+}
+
+if (wanted.has("events")) {
+  // G: every event source. Counts are compared with what the page itself lists (its <item>s,
+  // <meeting>s or events), and a sample of each is printed. Requests go one at a time.
+  const items = (xml: string, re: RegExp) => [...xml.matchAll(re)].length;
+  const placeholder = (xml: string) => /No (committee meetings scheduled|calendars are available)/i.test(xml) ? 1 : 0;
+  for (const type of ["upcomingmeetingshouse", "upcomingmeetingssenate", "upcomingmeetingsjoint"]) {
+    const xml = (await http.text(`${TLO_RSS}${type}`)).text;
+    const meetings = parseMeetingFeed(xml);
+    console.log(`G1 TLO ${type}: ${meetings.length} parsed / ${items(xml, /<item>/g) - placeholder(xml)} listed`, meetings[0] ?? "(none listed)");
+  }
+  const member = memberCommittees((await http.text("https://capitol.texas.gov/Members/MemberInfo.aspx?Leg=89&Chamber=H&Code=A3820")).text);
+  console.log(`G1 TLO member page (89th, A3820): ${member.length} committees`, member.map((c) => `${c.code} ${c.name}`));
+  for (const [type, chamber] of [["upcomingcalendarshouse", "H"], ["upcomingcalendarssenate", "S"]] as const) {
+    const xml = (await http.text(`${TLO_RSS}${type}`)).text;
+    const days = parseCalendarFeed(xml, chamber);
+    console.log(`G2 TLO ${type}: ${days.reduce((n, d) => n + d.documents.length, 0)} documents parsed / ${items(xml, /<item>/g) - placeholder(xml)} listed, ${days.length} floor days`, days[0] ?? "(none listed)");
+  }
+  const floor = parseFloorSchedule((await http.text(SENATE_FLOOR_SCHEDULE)).text);
+  console.log("G3 Senate floor schedule, next meeting:", floor);
+  for (const year of [2026, 2027]) {
+    const res = await http.text(senateScheduleUrl(year));
+    const xml = res.text.includes("<schedule>") ? res.text : "";
+    console.log(`G3 Senate tentative ${year} schedule: ${xml ? `${parseTentativeSchedule(xml).length} parsed / ${items(xml, /<beginDate>/g)} listed` : "not published"}`);
+  }
+  const hearingsXml = (await http.text(SENATE_HEARINGS)).text;
+  const hearings = parseSenateHearings(hearingsXml);
+  const members = (await http.text(SENATE_MEMBERS)).text;
+  const cornyn = senatorCommittees(members, "C001056") ?? [];
+  console.log(`G4 Senate hearings: ${hearings.length} parsed / ${items(hearingsXml, /<identifier>/g)} listed; ${items(members, /<senator /g)} senators in member data; C001056 sits on ${cornyn.length} committees, ${hearings.filter((h) => cornyn.some((c) => c.code === h.code)).length} of the hearings`, hearings[0]);
+  const texts: Partial<Record<LawKey, string>> = {};
+  const fetched = new Map<string, string>();
+  for (const key of Object.keys(LAWS) as LawKey[]) {
+    const url = LAWS[key].fetch;
+    if (!fetched.has(url)) fetched.set(url, lawText((await http.text(url, 30_000)).text));
+    texts[key] = fetched.get(url);
+  }
+  const verified = verifiedLaws(texts);
+  console.log(`G5 law texts: ${verified.size}/${Object.keys(LAWS).length} rules found word for word`, [...verified]);
+  const today = centralDate(new Date());
+  for (const [office, start] of [["tx_house", "2027-01-12"], ["tx_lt_governor", "2027-01-19"], ["governor", "2027-01-19"], ["us_senate", "2027-01-03"]]) {
+    console.log(`G5 ${office}:`, legalEvents(office, today, verified, start).map((d) => `${d.starts_on} ${d.title} [${d.legal_basis}]`));
+  }
+  const goodwin = await http.json("https://www.vikkigoodwin.com/events?format=json");
+  console.log(`G6 vikkigoodwin.com/events: ${squarespaceEvents(goodwin, "https://www.vikkigoodwin.com").length} upcoming, ${squarespacePast(goodwin, "https://www.vikkigoodwin.com").length} past on the first page`);
+  for (const slug of ["ginahinojosafortexasgovernor", "talaricofortexas", "zach4texas"]) {
+    const org = mobilizeOrganization((await http.text(`https://www.mobilize.us/${slug}/`)).text);
+    const json = (await http.json(`https://api.mobilize.us/v1/organizations/${org}/events?timeslot_start=gte_now&per_page=100`)) as { data: { sponsor: { id: number } }[] };
+    console.log(`G6 mobilize.us/${slug} (org ${org}): ${json.data.length} upcoming listed, ${json.data.filter((e) => e.sponsor.id === org).length} hosted by the campaign, ${mobilizeEvents(json, org!).length} time slots kept`);
+  }
 }

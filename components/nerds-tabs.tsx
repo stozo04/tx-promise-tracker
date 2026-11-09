@@ -11,6 +11,7 @@ import { ShowMore } from "@/components/show-more";
 import { SyncButton, type SyncSummary } from "@/components/sync-button";
 import { actionLabel, officialStance, stanceText } from "@/lib/community";
 import type { DataSource } from "@/lib/data-sources";
+import { kindLabel, sourcesFor, timeLabel } from "@/lib/events";
 import { formatLongDate, formatNumber } from "@/lib/format";
 import { earlierRole, officeRecordNote, officeRecordTab, officeRole, officeUpcoming } from "@/lib/offices";
 import type { Teaser } from "@/lib/roadmap";
@@ -25,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 type Tab = "upcoming" | "record" | "money" | "site" | "data";
 
-function NotLoaded({ teaser, lead }: { teaser?: Teaser; lead: string }) {
+function NotLoaded({ teaser, lead, sources }: { teaser?: Teaser; lead: string; sources?: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-3xl border border-dashed border-mesquite/40 bg-card/80 p-6">
       <p className="inline-flex self-start rounded-full bg-limestone px-2.5 py-1 text-xs font-semibold text-ink">
@@ -36,6 +37,12 @@ function NotLoaded({ teaser, lead }: { teaser?: Teaser; lead: string }) {
         <p className="text-sm leading-6">
           <span className="font-semibold">Where the records will come from. </span>
           {teaser.sources}
+        </p>
+      ) : null}
+      {sources ? (
+        <p className="text-sm leading-6">
+          <span className="font-semibold">Where the events will come from. </span>
+          {sources}
         </p>
       ) : null}
       <p className="text-sm text-muted-foreground">
@@ -143,6 +150,7 @@ function share(part: number | null, whole: number | null) {
 
 export function NerdsTabs({
   name,
+  slug,
   office,
   archives,
   dataSources,
@@ -156,6 +164,7 @@ export function NerdsTabs({
   years,
 }: {
   name: string;
+  slug: string;
   office: string;
   archives: ArchiveCard[];
   dataSources: DataSource[];
@@ -228,31 +237,58 @@ export function NerdsTabs({
       {tab === "upcoming" ? (
         upcoming.length === 0 ? (
           <NotLoaded
-            lead={
-              `${officeUpcoming(office)} for ${name} are not loaded yet.`
-            }
-            teaser={votes}
+            lead={`${officeUpcoming(office)} for ${name} are not loaded yet.`}
+            sources={`${capitalize(sourcesFor([office]).join("; "))}. Sync checks them every day.`}
           />
-        ) : shownUpcoming.length === 0 ? (
-          <p className="rounded-3xl border border-dashed px-5 py-8">Nothing scheduled for {year} yet.</p>
         ) : (
-          <ul className="flex flex-col rounded-3xl border border-border bg-card">
-            {shownUpcoming.map((event) => (
-              <li
-                key={event.id}
-                className="grid gap-x-5 gap-y-1 border-b border-border px-5 py-4 last:border-b-0 sm:grid-cols-[11rem_minmax(0,1fr)]"
-              >
-                <span className="font-extrabold">{event.when_label ?? formatLongDate(event.starts_on) ?? "Date not set"}</span>
-                <span className="flex flex-col gap-1">
-                  <span className="font-bold">{event.title}</span>
-                  <a href={event.source_url} className="inline-flex items-center gap-1 self-start text-sm text-muted-foreground underline underline-offset-4">
-                    {event.source_name}
-                    <ExternalLink className="size-3.5" aria-hidden="true" />
-                  </a>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex flex-col gap-3">
+            {shownUpcoming.length === 0 ? (
+              <p className="rounded-3xl border border-dashed px-5 py-8">Nothing scheduled for {year} yet.</p>
+            ) : (
+              <ul className="flex flex-col rounded-3xl border border-border bg-card">
+                {shownUpcoming.map((event) => {
+                  const cancelled = event.status === "cancelled";
+                  return (
+                    <li
+                      key={event.id}
+                      className="grid gap-x-5 gap-y-1 border-b border-border px-5 py-4 last:border-b-0 sm:grid-cols-[11rem_minmax(0,1fr)]"
+                    >
+                      <span className="flex flex-col">
+                        <span className="font-extrabold">{formatLongDate(event.starts_on) ?? "Date not set"}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {timeLabel({ startsAt: event.starts_at, kind: event.kind, date: event.starts_on ?? "", endDate: event.ends_on, legal: Boolean(event.legal_basis) })}
+                        </span>
+                      </span>
+                      <span className="flex flex-col gap-1">
+                        <span className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="rounded-full border border-foreground/60 px-2 py-0.5 font-bold uppercase tracking-[0.06em]">
+                            {event.is_campaign ? "Campaign event" : kindLabel(event.kind)}
+                          </span>
+                          {cancelled ? (
+                            <span className="rounded-full bg-[var(--against-bg)] px-2 py-0.5 font-bold text-[var(--against-fg)]">Cancelled</span>
+                          ) : null}
+                        </span>
+                        <Link
+                          href={`/events/${event.id}`}
+                          className={cn("inline-flex min-h-11 items-center self-start font-bold underline underline-offset-4", cancelled && "line-through")}
+                        >
+                          {event.title}
+                        </Link>
+                        <span className="text-sm text-muted-foreground">
+                          {event.legal_basis ? `Computed from ${event.legal_basis}` : `Source: ${event.source_name}`}
+                        </span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p className="text-right text-sm">
+              <Link href={`/events?official=${slug}`} className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">
+                See {name} on the Events calendar
+              </Link>
+            </p>
+          </div>
         )
       ) : null}
 
@@ -489,4 +525,8 @@ export function NerdsTabs({
       </div>
     </div>
   );
+}
+
+function capitalize(text: string) {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 }

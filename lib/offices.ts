@@ -21,7 +21,7 @@ type OfficeInfo = {
   recordTab: string;
   /** What the record means for this office, shown above it. Null when the plain label says enough. */
   recordNote: string | null;
-  /** What the upcoming tab will hold once it is loaded. */
+  /** What the upcoming tab and the Events calendar hold for this office (loaded by Sync). */
   upcoming: string;
   /** Where votes or bill actions will come from. */
   recordSources: string;
@@ -42,7 +42,7 @@ export const OFFICES: Record<string, OfficeInfo> = {
     kind: "chamber",
     recordTab: "How they voted",
     recordNote: null,
-    upcoming: "Upcoming Senate votes and committee hearings",
+    upcoming: "Upcoming Senate session days, committee hearings, the start of the term, and campaign events",
     recordSources: "Congress.gov and Senate roll calls",
     moneySources: "FEC filings",
     recordState: "Loaded by Sync once the term starts.",
@@ -57,7 +57,7 @@ export const OFFICES: Record<string, OfficeInfo> = {
     recordTab: "Signed & vetoed",
     recordNote:
       "Governors do not vote on bills. They sign them, veto them, or let them become law without a signature.",
-    upcoming: "Upcoming bill deadlines, special sessions, and signing dates",
+    upcoming: "Upcoming dates set by law (the installation and the veto period) and campaign events",
     recordSources: "Texas bill signings and vetoes",
     moneySources: "Texas Ethics Commission reports",
     recordState: "Loaded by Sync once the term starts.",
@@ -72,7 +72,7 @@ export const OFFICES: Record<string, OfficeInfo> = {
     recordTab: "Senate record",
     recordNote:
       "The lieutenant governor is President of the Texas Senate and appoints its committees. Under the Texas Constitution (Article 4, Section 16), the office votes only in the Committee of the Whole Senate or to break a tie.",
-    upcoming: "Upcoming Texas Senate sessions and committee hearings",
+    upcoming: "Upcoming Texas Senate session days and floor calendars, dates set by law, and campaign events",
     recordSources: "The Texas Senate Journal and Texas Legislature Online",
     moneySources: "Texas Ethics Commission reports",
     recordState: "Loaded by Sync once the term starts.",
@@ -86,7 +86,7 @@ export const OFFICES: Record<string, OfficeInfo> = {
     kind: "chamber",
     recordTab: "How they voted",
     recordNote: null,
-    upcoming: "Upcoming Texas House floor votes and committee hearings",
+    upcoming: "Upcoming Texas House session days, floor calendars, committee hearings, dates set by law, and campaign events",
     recordSources: "Texas Legislature Online and Texas House record votes",
     moneySources: "Texas Ethics Commission reports",
     recordState: "Loaded by Sync once the term starts.",

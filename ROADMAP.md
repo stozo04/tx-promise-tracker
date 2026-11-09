@@ -21,11 +21,14 @@ Texas Promise Tracker currently shows campaign promises, each with a verbatim qu
 - **Topic sweep.** Each Sync reads every official's campaign pages for each topic in the topic registry (`tx_tracker.tx_topics`) and queues keyword matches for review. A match never becomes a promise until a person confirms the verbatim quote and the source.
 - **Watched bills.** Each topic lists related bills. Sync reads their history on Texas Legislature Online and the House Journal record votes, and stores how any tracked official voted while serving in the Texas House. Those votes are shown under "Earlier record", apart from the office tracked now.
 
+## Live for every official: events
+
+- **Events calendar** (`/events`). Sync loads session days, floor calendars, committee hearings of each official's own committees, dates the law sets, and campaign events from their primary sources, each event linked to the page or law that sets it. Before the terms start in January 2027, most legislative sources list nothing yet; the page says which sources are not loaded.
+
 ## Next
 
 - Automate Texas Legislature Online and Office of the Governor records.
 - Automate Texas Ethics Commission campaign finance reports.
-- Load upcoming events (Senate floor schedule, Texas bill deadlines and sessions) from their official sources.
 
 ## Rules that still apply
 
