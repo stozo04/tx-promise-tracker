@@ -32,7 +32,7 @@ const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const POLITICIAN_COLUMNS = "id, name, slug, office, election_date, term_start, fec_candidate_id, bioguide_id, lis_member_id, tec_filer_id";
+const POLITICIAN_COLUMNS = "id, name, slug, office, election_date, term_start, fec_candidate_id, bioguide_id, lis_member_id, tec_filer_id, campaign_events_url";
 
 function reply(body: unknown, status = 200, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {

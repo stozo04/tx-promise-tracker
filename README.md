@@ -47,6 +47,8 @@ GitHub Actions copies `.env.example` to `.env.local` before lint, typecheck, and
 - A header theme button. It follows the system setting until you pick light or dark, then remembers that choice in this browser.
 - `/politicians/james-talarico` and `/politicians/gina-hinojosa`: Promise vs. Delivered. The flag panel, an at-a-glance chart of each explicit pledge, and Said / Did cards that pair each promise with the evidence filed against it
 - `/politicians/[slug]/nerds`: upcoming events, votes, campaign money, the archived campaign site, data sources, and the Sync button
+- `/events`: a month calendar and an agenda of upcoming events for all four officials (session and floor days, committee hearings, dates set by law, campaign events). One dropdown narrows it to an official (`?official=vikki-goodwin`) and one to a kind of event; the month and view are in the URL too. Times are Central. A month with nothing loaded names the sources that will fill it.
+- `/events/[id]`: one event with its official(s), time, place, body, details and status, and a link to the page that announced it, or, for a date the law sets, the citation, the law's text and the date it was computed from
 - `/promises/[id]` quote, source, archive, and status timeline
 - `/archives` screenshots
 - `/how-we-track` methodology
@@ -126,6 +128,8 @@ Each action in a Did card and each record on the For the nerds page has a "How w
 
 Anyone can press "Sync all officials" (on each For the nerds page and on How we track), but the whole site gets one sync per calendar day in Central time. If nobody presses it, a pg_cron job starts it at 11:30 pm CT. `tx_tracker.tx_claim_sync()` claims the day under an advisory lock, so two presses at once cannot both start one. After a run the button says how long until midnight CT. Each source runs in its own request and fails on its own, and the run's counts, notes, and errors are written to `tx_tracker.ingest_runs` and listed under "Last run results". [SYNC.md](SYNC.md) covers every source.
 
+Sync also loads the Events calendar (`tx_upcoming_events`) from five sources: dates set by law (read from the law's text each run), Texas Legislature Online floor calendars and committee meetings, the U.S. Senate's floor schedule, tentative schedule and committee hearings, and each campaign's own events page. Hearings are matched through committee membership stored in `tx_committee_memberships`. Events are refreshed when their time, place or agenda changes, and never deleted. See [SYNC.md](SYNC.md#events).
+
 One run covers every official and every active topic in `tx_tracker.tx_topics` (see `supabase/functions/tx_sync/topics.ts`):
 
 - **Campaign pages.** Each official's campaign sitemap, plus `politicians.campaign_watch_urls` for subdomain pages, is listed in `tx_watched_pages`. Each run reads every page in batches of 100, oldest-checked first, until all are read or the run's time is up. A page is matched again only when its visible text changes. Keyword matches are whole-word; an all-caps keyword such as `THC` matches case-sensitively.
@@ -139,7 +143,7 @@ To add a topic, insert a row in `tx_topics` with a code, a label, keywords and a
 
 Everything for this project is prefixed `tx_`.
 
-- `supabase/migrations/`: the `tx_` tables (`tx_record_actions`, `tx_upcoming_events`, `tx_contributions`, `tx_contribution_summaries`, `tx_community_votes`, `tx_private_settings`, `tx_topics`, `tx_topic_findings`, `tx_watched_pages`, `tx_legislative_service`), the `tx_community_vote_totals` view, and `tx_claim_sync()`. Public roles can read records and vote totals. They cannot read raw votes or private settings, and they cannot write.
+- `supabase/migrations/`: the `tx_` tables (`tx_record_actions`, `tx_upcoming_events`, `tx_contributions`, `tx_contribution_summaries`, `tx_community_votes`, `tx_private_settings`, `tx_topics`, `tx_topic_findings`, `tx_watched_pages`, `tx_legislative_service`, `tx_committee_memberships`), the `tx_community_vote_totals` view, and `tx_claim_sync()`. Public roles can read records and vote totals. They cannot read raw votes or private settings, and they cannot write.
 - `supabase/functions/tx_community_vote`: `GET ?items=status_update:<id>,record_action:<id>` returns your vote and the totals. `POST {item_type, item_id, choice}` records a vote, or answers `409` "You've already voted on this."
 - `supabase/functions/tx_sync`: `POST` starts a sync, or answers `429` with how long to wait.
 - `tx_tracker.tx_private_settings` holds the IP hash salt and the api.data.gov key (Congress.gov and FEC). Only `service_role` can read it. An Edge Function secret named `TX_DATA_GOV_API_KEY` takes precedence if you set one.

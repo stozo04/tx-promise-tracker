@@ -1,4 +1,4 @@
-# Checks every pull request (and every push to main) against AGENTS.md rule 18.
+# Checks every pull request (and every push to main) against AGENTS.md rules 18 and 21.
 name: CI
 
 on:
@@ -50,3 +50,38 @@ jobs:
           done
       - name: deno test (Sync parsers and rules, on saved primary-source pages)
         run: deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/
+
+  sync-docs:
+    # AGENTS.md rule 21: a change to Sync comes with a change to SYNC.md.
+    name: SYNC.md updated with Sync changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Sync changes come with SYNC.md
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA" HEAD)
+          sync=$(printf '%s\n' "$changed" \
+            | grep -E '^(supabase/functions/tx_sync/|scripts/sync-live-check\.ts$|lib/sync\.ts$|components/sync-button\.tsx$|app/api/sync/)' \
+            | grep -v '^supabase/functions/tx_sync/tests/' || true)
+          if [ -z "$sync" ]; then
+            echo "No Sync files changed."
+            exit 0
+          fi
+          if printf '%s\n' "$changed" | grep -qx 'SYNC.md'; then
+            echo "Sync files changed and SYNC.md was updated."
+            exit 0
+          fi
+          if printf '%s' "$PR_BODY" | grep -q 'SYNC.md: no change needed'; then
+            echo "Sync files changed; the description says SYNC.md needs no change."
+            exit 0
+          fi
+          echo "::error::These Sync files changed but SYNC.md did not (AGENTS.md rule 21):"
+          printf '%s\n' "$sync"
+          echo "Update SYNC.md, or add 'SYNC.md: no change needed' and the reason to the pull request description."
+          exit 1

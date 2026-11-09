@@ -75,6 +75,7 @@ async function NerdsRecord({ params }: Props) {
       </header>
       <NerdsTabs
         name={politician.name}
+        slug={politician.slug}
         office={politician.office}
         archives={archives}
         dataSources={dataSourcesFor(politician.office)}

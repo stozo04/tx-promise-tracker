@@ -46,6 +46,7 @@ export type Politician = {
   bioguide_id: string | null;
   lis_member_id: string | null;
   tec_filer_id: string | null;
+  campaign_events_url: string | null;
 };
 
 /** Everything a source needs for one run. */
