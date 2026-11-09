@@ -48,3 +48,5 @@ jobs:
             echo "Checking $fn"
             deno check --node-modules-dir=none "$fn"
           done
+      - name: deno test (Sync parsers and rules, on saved primary-source pages)
+        run: deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/

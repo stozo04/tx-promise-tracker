@@ -2,8 +2,8 @@
 //
 // For every active topic in tx_topics:
 //   1. Campaign pages. Each official's campaign sitemap (plus politicians.campaign_watch_urls) is
-//      listed into tx_watched_pages. Each run reads the pages checked longest ago, up to a cap and a
-//      time budget, so a long list finishes over several runs. A page is matched again only when
+//      listed into tx_watched_pages. Each run reads every page in batches of PAGE_BATCH, oldest-
+//      checked first, until all are read or the run's time is up. A page is matched again only when
 //      its visible text changed (SHA-256 of the text). Keyword matches go into tx_topic_findings
 //      with status 'new'. They are never published as promises: a person confirms the verbatim
 //      quote and the source first.
@@ -13,17 +13,8 @@
 //      history is read. House record votes are copied from the House Journal for every tracked
 //      official who served in that legislature (tx_legislative_service), labeled with the office
 //      they held then. Recent bill actions (filed, passed, signed, vetoed...) become findings.
-import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
-
-// The client is created with db.schema "tx_tracker".
-// deno-lint-ignore no-explicit-any
-type Db = SupabaseClient<any, "public", "tx_tracker", any, any>;
-
-export type Log = {
-  counts: Record<string, unknown>;
-  errors: { source: string; message: string }[];
-  notes: string[];
-};
+import { houseJournalHtml, officeContext, parseRecordVote } from "./journal.ts";
+import { bump, type Ctx, cellText, type Db, decodeEntities, type Log, message, UA } from "./shared.ts";
 
 type Topic = {
   code: string;
@@ -42,20 +33,16 @@ type Official = {
   campaign_watch_urls: string[] | null;
 };
 
-const UA = "PromiseVsDelivered/1.0 (+https://github.com/stozo04/tx-promise-tracker)";
-/** Pages read per run. The rest wait for the next run, oldest-checked first. */
-const MAX_PAGES_PER_RUN = 80;
-/** Stop starting new page reads after this long, so the run ends inside the Edge Function limit. */
-const PAGE_TIME_BUDGET_MS = 100_000;
-const PAGE_CONCURRENCY = 4;
+/**
+ * Pages read in one batch. Each batch runs in its own request (its own CPU budget), and the run
+ * keeps starting batches until every page has been read this run or the run's time is up.
+ */
+export const PAGE_BATCH = 100;
+const PAGE_CONCURRENCY = 6;
 const MAX_SITEMAP_URLS = 600;
 const MAX_FINDINGS_PER_PAGE_TOPIC = 10;
 /** Bill actions older than this are history, not news, and are not queued as findings. */
 const BILL_ACTION_WINDOW_DAYS = 30;
-
-function bump(log: Log, key: string, by = 1) {
-  log.counts[key] = ((log.counts[key] as number | undefined) ?? 0) + by;
-}
 
 function bumpMatch(log: Log, slug: string, topic: string, by: number) {
   const all = (log.counts.topic_matches ??= {}) as Record<string, Record<string, number>>;
@@ -75,22 +62,6 @@ async function fetchText(url: string, timeoutMs = 20_000) {
     redirect: "follow",
   });
   return { status: res.status, ok: res.ok, text: res.ok ? await res.text() : "" };
-}
-
-const ENTITIES: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", rdquo: "”",
-  ldquo: "“", mdash: "—", ndash: "–", hellip: "…", eacute: "é", aacute: "á", iacute: "í", oacute: "ó",
-  uacute: "ú", ntilde: "ñ", copy: "©",
-};
-
-export function decodeEntities(text: string) {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, code: string) => {
-    if (code[0] === "#") {
-      const n = code[1] === "x" || code[1] === "X" ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
-      return Number.isFinite(n) ? String.fromCodePoint(n) : all;
-    }
-    return ENTITIES[code.toLowerCase()] ?? all;
-  });
 }
 
 /** The text a visitor sees: no scripts, styles, or markup. Block elements become line breaks. */
@@ -137,6 +108,14 @@ function excerptAround(text: string, start: number, end: number) {
     to = tail ? end + tail[0].length : to;
   }
   return { from, to, excerpt: `${from > lineStart ? "…" : ""}${text.slice(from, to).trim()}${to < lineEnd ? "…" : ""}` };
+}
+
+/**
+ * A passage worth a person's review: at least five words. Shorter matches are menu items, buttons,
+ * and headings ("Cannabis & THC" in a site's navigation), not statements.
+ */
+export function isStatement(excerpt: string) {
+  return excerpt.replace(/[…]/g, " ").trim().split(/\s+/).filter((word) => /[A-Za-z0-9]/.test(word)).length >= 5;
 }
 
 /** Every passage in the text that mentions one of the topic's keywords, one per distinct excerpt. */
@@ -192,25 +171,41 @@ async function listPages(db: Db, officials: Official[], log: Log) {
       const { error } = await db.from("tx_watched_pages").upsert(unique, { onConflict: "url", ignoreDuplicates: true });
       if (error) throw new Error(`tx_watched_pages: ${error.message}`);
     } catch (err) {
-      log.errors.push({ source: `topics_sitemap:${p.slug}`, message: err instanceof Error ? err.message : String(err) });
+      log.errors.push({ source: `topics_sitemap:${p.slug}`, message: message(err) });
     }
   }
 }
 
-async function readPages(db: Db, officials: Official[], topics: Topic[], log: Log, startedAt: number) {
+/**
+ * Read one batch of campaign pages: the ones not yet read in this run, oldest-checked first.
+ * Returns true when more pages are still waiting, so the run starts another batch.
+ */
+async function readPages(ctx: Ctx, officials: Official[], topics: Topic[]) {
+  const { db, log } = ctx;
   const bySlug = new Map(officials.map((p) => [p.id, p]));
+  const notThisRun = `last_checked_at.is.null,last_checked_at.lt.${ctx.runStartedAt}`;
   const { data, error } = await db
     .from("tx_watched_pages")
     .select("url, politician_id, content_hash")
+    .or(notThisRun)
     .order("last_checked_at", { ascending: true, nullsFirst: true })
-    .limit(MAX_PAGES_PER_RUN);
+    .limit(PAGE_BATCH);
   if (error) throw new Error(`tx_watched_pages: ${error.message}`);
   const queue = [...((data ?? []) as { url: string; politician_id: string; content_hash: string | null }[])];
-  log.counts.topic_pages_checked = 0;
-  log.counts.topic_pages_changed = 0;
+  // Passages already queued for an official and topic on any page, so text repeated across a site
+  // (a menu, a footer, a banner) is queued once, not once per page.
+  const known = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data: rows, error: knownError } = await db.from("tx_topic_findings").select("politician_id, topic, content_hash").eq("kind", "page").range(from, from + 999);
+    if (knownError) throw new Error(`tx_topic_findings: ${knownError.message}`);
+    for (const row of (rows ?? []) as { politician_id: string; topic: string; content_hash: string }[]) known.add(`${row.politician_id}:${row.topic}:${row.content_hash}`);
+    if ((rows ?? []).length < 1000) break;
+  }
+  bump(log, "topic_pages_checked", 0);
+  bump(log, "topic_pages_changed", 0);
 
   async function worker() {
-    while (queue.length > 0 && Date.now() - startedAt < PAGE_TIME_BUDGET_MS) {
+    while (queue.length > 0 && Date.now() < ctx.deadline) {
       const page = queue.shift()!;
       const official = bySlug.get(page.politician_id);
       if (!official) continue;
@@ -234,9 +229,15 @@ async function readPages(db: Db, officials: Official[], topics: Topic[], log: Lo
         bump(log, "topic_pages_changed");
         const findings: Record<string, unknown>[] = [];
         for (const topic of topics) {
-          const matches = matchTopic(text, topic);
-          bumpMatch(log, official.slug, topic.code, matches.length);
-          for (const match of matches) {
+          let queued = 0;
+          for (const match of matchTopic(text, topic)) {
+            if (!isStatement(match.excerpt)) continue;
+            // Keyed on the excerpt, so a passage is queued once per official and topic.
+            const hash = await sha256(match.excerpt);
+            const key = `${official.id}:${topic.code}:${hash}`;
+            if (known.has(key)) continue;
+            known.add(key);
+            queued++;
             findings.push({
               politician_id: official.id,
               topic: topic.code,
@@ -244,10 +245,10 @@ async function readPages(db: Db, officials: Official[], topics: Topic[], log: Lo
               url: page.url,
               excerpt: match.excerpt,
               keyword: match.keyword,
-              // Keyed on the excerpt, so an unchanged passage on an edited page is not queued twice.
-              content_hash: await sha256(match.excerpt),
+              content_hash: hash,
             });
           }
+          bumpMatch(log, official.slug, topic.code, queued);
         }
         if (findings.length > 0) {
           const { error: insertError } = await db
@@ -261,12 +262,15 @@ async function readPages(db: Db, officials: Official[], topics: Topic[], log: Lo
           .eq("url", page.url);
       } catch (err) {
         await db.from("tx_watched_pages").update({ last_checked_at: now }).eq("url", page.url);
-        log.errors.push({ source: `topics_page:${official.slug}`, message: `${page.url}: ${err instanceof Error ? err.message : String(err)}` });
+        log.errors.push({ source: `topics_page:${official.slug}`, message: `${page.url}: ${message(err)}` });
       }
     }
   }
   await Promise.all(Array.from({ length: PAGE_CONCURRENCY }, worker));
-  if (queue.length > 0) log.notes.push(`Topics: stopped at the time budget; ${queue.length} pages wait for the next run.`);
+  const { count } = await db.from("tx_watched_pages").select("url", { count: "exact", head: true }).or(notThisRun);
+  const waiting = count ?? 0;
+  if (waiting > 0 && Date.now() >= ctx.deadline) log.notes.push(`Topics: stopped at the time budget; ${waiting} pages wait for the next run.`);
+  return waiting > 0;
 }
 
 async function readPosts(db: Db, officials: Official[], topics: Topic[], log: Log) {
@@ -311,7 +315,7 @@ async function readPosts(db: Db, officials: Official[], topics: Topic[], log: Lo
         if (error) throw new Error(`tx_topic_findings: ${error.message}`);
       }
     } catch (err) {
-      log.errors.push({ source: `topics_x:${p.slug}`, message: err instanceof Error ? err.message : String(err) });
+      log.errors.push({ source: `topics_x:${p.slug}`, message: message(err) });
     }
   }
 }
@@ -319,13 +323,6 @@ async function readPosts(db: Db, officials: Official[], topics: Topic[], log: Lo
 // --- Watched bills: Texas Legislature Online history and House Journal record votes.
 
 type HistoryRow = { chamber: string; description: string; comment: string; date: string; journalHref: string | null };
-
-function cellText(html: string) {
-  return decodeEntities(html.replace(/<br\b[^>]*>/gi, " ").replace(/<\/?(td|th|tr|p|div|li)\b[^>]*>/gi, " ").replace(/<[^>]+>/g, ""))
-    .replace(/\s+/g, " ")
-    .replace(/\s+([,.;:])/g, "$1")
-    .trim();
-}
 
 export function parseHistory(html: string) {
   const caption = cellText(html.match(/id="lblCaptionText"[^>]*>([\s\S]*?)<\/span>/)?.[1] ?? "") || null;
@@ -346,78 +343,6 @@ export function parseHistory(html: string) {
     });
   }
   return { caption, rows };
-}
-
-/** The HTML day page for a House Journal PDF link. */
-export function houseJournalHtml(pdfHref: string) {
-  const match = pdfHref.match(/journals\.house\.texas\.gov\/hjrnl\/([^/]+)\/pdf\/([^#?]+)\.pdf/i);
-  if (!match) return null;
-  return `https://journals.house.texas.gov/HJRNL/${match[1].toUpperCase()}/HTML/${match[2].toUpperCase()}.HTM`;
-}
-
-export type RecordVote = {
-  question: string;
-  result: string | null;
-  lists: Record<string, string[]>;
-};
-
-const LIST_LABELS: [RegExp, "yea" | "nay" | "present" | "absent"][] = [
-  [/^Yeas\b/, "yea"],
-  [/^Nays\b/, "nay"],
-  [/^Present, not voting\b/, "present"],
-  [/^Absent\b/, "absent"],
-];
-
-/** Find "(Record N)" in a House Journal day page and read who voted which way. */
-export function parseRecordVote(dayHtml: string, record: string): RecordVote | null {
-  const paragraphs = dayHtml
-    .split(/<\/div>/i)
-    .map((chunk) => cellText(chunk))
-    .filter(Boolean);
-  const at = paragraphs.findIndex((p) => new RegExp(`\\(Record ${record}\\)`).test(p));
-  if (at === -1) return null;
-  const sentence = paragraphs[at];
-  const clause = sentence.split(new RegExp(`\\s*\\(Record ${record}\\)`))[0].replace(/\s+by$/, "").trim();
-  // Context: the bill heading ("HB 1181 ON THIRD READING"). Who offered an amendment is not
-  // guessed: the nearest "offered the following amendment" line can belong to a different one.
-  let heading = "";
-  for (let i = at - 1; i >= Math.max(0, at - 400); i--) {
-    if (/^(C?S?[HS][BJRC]R?)\s?\d+\b.*\b(READING|AMENDMENTS?|REPORT|CALENDAR)\b/.test(paragraphs[i])) {
-      heading = paragraphs[i];
-      break;
-    }
-  }
-  const lists: Record<string, string[]> = {};
-  for (let i = at + 1; i < Math.min(paragraphs.length, at + 8); i++) {
-    const p = paragraphs[i];
-    const label = LIST_LABELS.find(([re]) => re.test(p));
-    if (!label) break;
-    const names = p
-      .replace(/^[^—]*—\s*/, "")
-      .replace(/\.$/, "")
-      .split(";")
-      .map((name) => name.replace(/\(C\)$/, "").trim())
-      .filter(Boolean);
-    lists[label[1]] = [...(lists[label[1]] ?? []), ...names];
-  }
-  const verb = clause.match(/\b(was|were)\s+(not\s+)?(adopted|passed|tabled|withdrawn)|\b(prevailed|failed|lost)\b/i)?.[0] ?? null;
-  const result = verb ? verb.replace(/^(was|were)\s+/i, "").replace(/^./, (c) => c.toUpperCase()) : null;
-  const question = [heading ? `${heading.replace(/\s+/g, " ")}.` : "", `${clause}.`].filter(Boolean).join(" ");
-  return { question, result, lists };
-}
-
-function ordinal(n: number) {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
-}
-
-/** "Texas House, District 47 (88th Legislature)" or "... (89th Legislature, 2nd called session)". */
-export function officeContext(district: string, session: string) {
-  const legislature = parseInt(session.slice(0, 2), 10);
-  const special = session.slice(2);
-  const called = /^\d$/.test(special) ? `, ${ordinal(Number(special))} called session` : "";
-  return `Texas House, District ${district} (${ordinal(legislature)} Legislature${called})`;
 }
 
 function billLabel(bill: string) {
@@ -537,42 +462,54 @@ async function checkBills(db: Db, topics: Topic[], log: Log) {
         bump(log, "house_votes", inserts.length);
       }
     } catch (err) {
-      log.errors.push({ source: `bill:${entry.session}:${entry.bill}`, message: err instanceof Error ? err.message : String(err) });
+      log.errors.push({ source: `bill:${entry.session}:${entry.bill}`, message: message(err) });
     }
   }
 }
 
-/** Check every active topic for every official. Each step fails on its own. */
-export async function topicSweep(db: Db, log: Log) {
-  const startedAt = Date.now();
+async function loadSweep(db: Db) {
   const { data: topicRows, error: topicError } = await db
     .from("tx_topics")
     .select("code, label, keywords, related_bills")
     .eq("active", true);
   if (topicError) throw new Error(`tx_topics: ${topicError.message}`);
-  const topics = (topicRows ?? []) as Topic[];
-  if (topics.length === 0) {
-    log.notes.push("Topics: no active topics in tx_topics.");
-    return;
-  }
   const { data: people, error: peopleError } = await db
     .from("politicians")
     .select("id, name, slug, x_user_id, x_handle, campaign_site_url, campaign_watch_urls");
   if (peopleError) throw new Error(`politicians: ${peopleError.message}`);
-  const officials = (people ?? []) as Official[];
-  log.notes.push(`Topics: checked ${topics.map((t) => t.label).join(", ")} for ${officials.map((p) => p.name).join(", ")}.`);
-
-  const steps: [string, () => Promise<void>][] = [
-    ["topics_bills", () => checkBills(db, topics, log)],
-    ["topics_sitemaps", () => listPages(db, officials, log)],
-    ["topics_pages", () => readPages(db, officials, topics, log, startedAt)],
-    ["topics_x", () => readPosts(db, officials, topics, log)],
-  ];
-  for (const [name, run] of steps) {
-    try {
-      await run();
-    } catch (err) {
-      log.errors.push({ source: name, message: err instanceof Error ? err.message : String(err) });
-    }
-  }
+  return { topics: (topicRows ?? []) as Topic[], officials: (people ?? []) as Official[] };
 }
+
+/**
+ * The topic sweep's steps, in order. Each runs in its own request and fails on its own. A step
+ * that returns true has more to do, and the run calls it again while time is left.
+ */
+export const TOPIC_STEPS: { key: string; run: (ctx: Ctx) => Promise<boolean | void> }[] = [
+  {
+    key: "topics_bills",
+    run: async (ctx) => {
+      const { topics, officials } = await loadSweep(ctx.db);
+      if (topics.length === 0) {
+        ctx.log.notes.push("Topics: no active topics in tx_topics.");
+        return;
+      }
+      ctx.log.notes.push(`Topics: checked ${topics.map((t) => t.label).join(", ")} for ${officials.map((p) => p.name).join(", ")}.`);
+      await checkBills(ctx.db, topics, ctx.log);
+    },
+  },
+  { key: "topics_sitemaps", run: async (ctx) => listPages(ctx.db, (await loadSweep(ctx.db)).officials, ctx.log) },
+  {
+    key: "topics_pages",
+    run: async (ctx) => {
+      const { topics, officials } = await loadSweep(ctx.db);
+      return topics.length > 0 && (await readPages(ctx, officials, topics));
+    },
+  },
+  {
+    key: "topics_x",
+    run: async (ctx) => {
+      const { topics, officials } = await loadSweep(ctx.db);
+      if (topics.length > 0) await readPosts(ctx.db, officials, topics, ctx.log);
+    },
+  },
+];

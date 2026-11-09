@@ -24,6 +24,8 @@ Open [http://localhost:3000](http://localhost:3000). The dev server also allows 
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `next typegen` and `tsc --noEmit` |
 | `npm run build` | Production build. It reads the live ledger while it prerenders. |
+| `deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/` | Sync's unit tests, run on saved primary-source pages |
+| `deno run --allow-net --allow-env=DATA_GOV_KEY --node-modules-dir=none scripts/sync-live-check.ts` | Runs Sync's parsers on the live sources (no writes) and prints statistics |
 
 ## Environment variables
 
@@ -122,11 +124,11 @@ Each action in a Did card and each record on the For the nerds page has a "How w
 
 ### Sync
 
-Anyone can press "Sync all officials" (on each For the nerds page and on How we track), but the whole site gets one sync per 24 hours. `tx_tracker.tx_claim_sync()` claims the slot under an advisory lock, so two presses at once cannot both start one. Inside the window the button says how long to wait. Each source runs on its own, and its counts, notes, and errors are written to `tx_tracker.ingest_runs`.
+Anyone can press "Sync all officials" (on each For the nerds page and on How we track), but the whole site gets one sync per calendar day in Central time. If nobody presses it, a pg_cron job starts it at 11:30 pm CT. `tx_tracker.tx_claim_sync()` claims the day under an advisory lock, so two presses at once cannot both start one. After a run the button says how long until midnight CT. Each source runs in its own request and fails on its own, and the run's counts, notes, and errors are written to `tx_tracker.ingest_runs` and listed under "Last run results". [SYNC.md](SYNC.md) covers every source.
 
 One run covers every official and every active topic in `tx_tracker.tx_topics` (see `supabase/functions/tx_sync/topics.ts`):
 
-- **Campaign pages.** Each official's campaign sitemap, plus `politicians.campaign_watch_urls` for subdomain pages, is listed in `tx_watched_pages`. Each run reads up to 80 pages, oldest-checked first, inside a time budget, so the rest wait for the next run. A page is matched again only when its visible text changes. Keyword matches are whole-word; an all-caps keyword such as `THC` matches case-sensitively.
+- **Campaign pages.** Each official's campaign sitemap, plus `politicians.campaign_watch_urls` for subdomain pages, is listed in `tx_watched_pages`. Each run reads every page in batches of 100, oldest-checked first, until all are read or the run's time is up. A page is matched again only when its visible text changes. Keyword matches are whole-word; an all-caps keyword such as `THC` matches case-sensitively.
 - **Watched bills.** For each topic's `related_bills`, Sync reads the Texas Legislature Online history and the House Journal record votes, and stores how each official in `tx_legislative_service` voted, with `office_context` set. Stored votes are never overwritten. Bill actions from the last 30 days become findings.
 - **X posts.** Only with an X API bearer token in `tx_private_settings` (`x_bearer_token`). Without one, the run notes say so. X is never scraped.
 - **Review queue.** Matches go to `tx_topic_findings` with status `new`. A finding never becomes a promise by itself: a person confirms the verbatim quote and the source, adds the promise, and sets the finding to `promoted` (with `promise_id`) or `dismissed`.

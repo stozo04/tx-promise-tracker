@@ -1,0 +1,1357 @@
+
+
+<!DOCTYPE html>
+<html lang="en-US">
+	<head>
+		<title>Bills By ... Reports | Texas Legislature Online</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=EmulateIE7" />
+		<link href="../Stylesheets/pagetabs.css" type="text/css" rel="stylesheet"/>
+		
+<meta charset="UTF-8" content=""/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>		
+<link rel="Shortcut Icon" type="image/x-icon" href="/images/favicon.ico" />			
+<link rel="stylesheet" href="/stylesheets/W3C/w3.css"/>     
+<link rel="stylesheet" href="/stylesheets/tlo.css"/>     
+<link href="/stylesheets/sideBarMenu.css" type="text/css" rel="stylesheet"/>	
+<script type="text/javascript" src="/scripts/BillNumber.js"></script>
+
+
+
+
+		<script type="text/javascript">
+	
+    function setErrorMsg(msg)
+    { 
+	  var vs = document.getElementById('validationSummary');
+	  if (vs == null) {
+	    alert(msg);
+	    return;
+	  }
+	  vs.innerHTML = "<font color='red'>*</font> " + msg;
+	  vs.style.display = "inline";
+    }	
+	
+	function SubmitForm()
+	{
+		if (event.keyCode == 13)
+		{
+			event.returnValue = false;
+			event.cancel = true;			
+		}
+	}
+
+	String.prototype.trim = function() {
+	    return (this.replace(/^[\s\xA0]+/, "").replace(/[\s\xA0]+$/, ""));
+	}	
+
+
+            function formatDate(dateId) {
+                var filingDate = $find(dateId).get_value();
+                var date = new Date(filingDate);
+                var month = date.getMonth();
+                return (month + 1) + '/' + date.getDate() + '/' + date.getFullYear();
+            }
+
+	function runReport(id, msg) {
+		var element = document.getElementById(id);
+		if ((element.selectedIndex <= 0) || element.value == "")
+		  {
+			 setErrorMsg("Please select " + msg + ".");
+			 return false;
+		  }
+		else
+		  {
+		    var legSess = document.getElementById('cboLegSess');
+		    switch(id) {
+		    case "cboAuthors":
+				var legCode = element.value;
+				var reportName = "Report.aspx?ID=author";
+				var reportParms = "&LegSess=" + legSess.value +
+					"&Code=" + legCode;		    
+		     break;
+		    case "cboSponsors":
+				var legCode = element.value;
+				var reportName = "Report.aspx?ID=sponsor";
+				var reportParms = "&LegSess=" + legSess.value +
+					"&Code=" + legCode;	
+		     break;
+		    case "cboCosponsors":
+				var legCode = element.value;
+				var reportName = "Report.aspx?ID=cosponsor";
+				var reportParms = "&LegSess=" + legSess.value +
+					"&Code=" + legCode;			    
+		     break;
+		    case "cboCoauthors":
+				var legCode = element.value;
+				var reportName = "Report.aspx?ID=coauthor";
+				var reportParms = "&LegSess=" + legSess.value +
+					"&Code=" + legCode;			    
+		     break;
+		    case "cboHouseCommittees":
+				var reportName = "Report.aspx?ID=committee";
+				var reportParms = "&LegSess=" + legSess.value +
+					"&Code=" + element.value;		    
+		     break;
+		    case "cboSenateCommittees":
+				var reportName = "Report.aspx?ID=committee";
+				var reportParms = "&LegSess=" + legSess.value +
+					"&Code=" + element.value;	
+		     break;
+		    case "cboSubjectCategory":
+				var reportName = "BillsBySubject.aspx?ID=subject";
+				var reportParms = "&LegSess=" + legSess.value +
+					"&Cat=" + element.value.substring(0,1);		    
+		     break;
+				case "dtFilingDate":
+                var filingDate = element.value;
+				if (filingDate.trim() === "")
+				  {
+					setErrorMsg("Please enter a filing date.");
+				    $find('dtFilingDate').focus();
+					return false;				
+				  }
+				var reportName = "Report.aspx?ID=filingDate";
+				var reportParms = "&LegSess=" + legSess.value +
+					"&Code=" + filingDate;
+				break;
+            case "dtFirstOnIntentDate":
+                    var intentDate = element.value;
+                if (intentDate.trim() === "") {
+                    setErrorMsg("Please enter an intent date.");
+                    $find('dtFirstOnIntentDate').focus();
+                return false;
+                }
+                var reportName = "FirstOnIntent.aspx?NOICalendarDate=" + intentDate;
+                var reportParms = "";
+                break;
+            case "dtHouseReferralDate":
+                    var referralDate = element.value;
+                if (referralDate.trim() === "") {
+                    setErrorMsg("Please enter a house referral date.");
+                    $find('dtHouseReferralDate').focus();
+                    return false;
+                }
+                var reportName = "Report.aspx?ID=housereferral";
+                var reportParms = "&LegSess=" + legSess.value +
+                    "&Date=" + referralDate;	
+                break; 		                    
+            case "dtSenateReferralDate":
+                    var referralDate = element.value;
+                if (referralDate.trim() === "") {
+                    setErrorMsg("Please enter a senate referral date.");
+                    $find('dtSenateReferralDate').focus();
+                    return false;
+                }
+                var reportName = "Report.aspx?ID=senatereferral";
+                var reportParms = "&LegSess=" + legSess.value +
+                    "&Date=" + referralDate;	
+                break; 		                    
+		    }
+			var reportPath = reportName + reportParms;		    
+		    if (id != "cboSubjectCategory") window.open(reportPath);
+		    else location = reportPath;
+		    return true;
+		  }
+	}
+	
+        </script>
+
+		<style>
+			.grid-template-two-column {
+	display: grid;
+	grid-template-columns: .15fr auto;
+	gap: 0px 0px;
+	grid-auto-flow: row;
+	padding-left: 5px;
+	margin: 10px 0 10px 0;
+	row-gap: 10px;
+}
+		</style>
+	</head>
+	<body id="billlookup">
+		
+
+<a href="#maincontent" class="skip-main">Skip to main content</a>
+
+<a name="top"></a>
+
+<header role="banner">
+<div class="w3-top">
+
+  <div class="w3-bar w3-theme w3-top w3-left-align w3-large">
+      <div class="header">
+          <a href="/Home.aspx" aria-label="Home"><img id="usrHeader_imgHeader" class="capImage" Width="162" Height="60" src="../Images/capitolLarge.jpg" alt="Texas Capitol" border="0" /></a>
+            <div id="desc">
+			<span class="applicationName"><span id="usrHeader_lblApplicationName" style="display:inline-block;"><font color="White">89th Legislature Second Called Session</font></span></span><br/>
+			<span class="pageDescription"><span id="usrHeader_lblPageTitle" style="display:inline-block;"><b><font color="White">Texas Legislature Online</font></b></span></span>
+          </div>
+          <div>              
+             <form method="post" aria-label="Search" role="search" name="search" action="/Search/HeaderSearch.aspx" class="search-form w3-hide-small w3-hide-medium" role="search">
+                  <label class="title" for="cboSearchLegSess">Search:</label>
+                  <select id="cboSearchLegSess" name="legSess" CssClass="cboLegSess" alt="Specify search legislative session"><option  value="90R">90(R)</option><option selected="selected" value="892">89(2)</option><option  value="891">89(1)</option><option  value="89R">89(R)</option><option  value="884">88(4)</option><option  value="883">88(3)</option><option  value="882">88(2)</option><option  value="881">88(1)</option><option  value="88R">88(R)</option><option  value="873">87(3)</option><option  value="872">87(2)</option><option  value="871">87(1)</option><option  value="87R">87(R)</option><option  value="86R">86(R)</option><option  value="851">85(1)</option><option  value="85R">85(R)</option><option  value="84R">84(R)</option><option  value="833">83(3)</option><option  value="832">83(2)</option><option  value="831">83(1)</option><option  value="83R">83(R)</option><option  value="821">82(1)</option><option  value="82R">82(R)</option><option  value="811">81(1)</option><option  value="81R">81(R)</option><option  value="80R">80(R)</option><option  value="793">79(3)</option><option  value="792">79(2)</option><option  value="791">79(1)</option><option  value="79R">79(R)</option><option  value="784">78(4)</option><option  value="783">78(3)</option><option  value="782">78(2)</option><option  value="781">78(1)</option><option  value="78R">78(R)</option><option  value="77R">77(R)</option><option  value="76R">76(R)</option><option  value="75R">75(R)</option><option  value="74R">74(R)</option><option  value="73R">73(R)</option><option  value="724">72(4)</option><option  value="723">72(3)</option><option  value="722">72(2)</option><option  value="721">72(1)</option><option  value="72R">72(R)</option><option  value="716">71(6)</option><option  value="715">71(5)</option><option  value="714">71(4)</option><option  value="713">71(3)</option><option  value="712">71(2)</option><option  value="711">71(1)</option><option  value="71R">71(R)</option></select>
+                  <label id="txtQueryLabel" for="txtQuery">-</label>
+                  <input type="text" id="txtQuery" name="query" style="width:160px" placeholder="Bill lookup or text search" alt="Specify search bill number or text" maxlength="30" />
+                  <button type="submit" id="btnSubmitSearch" class="search-submit">Go</button>
+              </form>
+          </div>
+          <div class="divider" style="float:left;height:1px"><p></p></div>
+      </div>   
+  </div>
+</div>
+</header>
+
+		
+
+<!-- Navbar -->
+<nav role="navigation" aria-label="site navigation">
+<div class="w3-middle navBarLinks">
+  <div class="w3-bar w3-theme w3-left-align w3-large">
+    <a class="w3-bar-item w3-button w3-right w3-hide-large w3-hover-black w3-large" href="javascript:void(0)" onclick="w3_open()" aria-description="Open Menu" aria-label="Open Menu"><img src="/images/menu.svg" aria-hidden="true" focusable="false" alt="Menu icon" /></a>
+    <a href="/Home.aspx" class="nav-home w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Home</a>
+    <a href="/MnuMyTLO.aspx" class="nav-mytlo w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">My TLO</a>
+    <a href="/MnuHouse.aspx" class="nav-house w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">House</a>
+    <a href="/MnuSenate.aspx" class="nav-senate w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Senate</a>
+    <a href="/MnuLegislation.aspx" class="nav-billlookup w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Legislation</a>
+    <a href="/MnuSearch.aspx" class="nav-search w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Search</a>
+    <a href="/MnuCommittees.aspx" class="nav-committees w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Committees</a>
+    <a href="/MnuCalendars.aspx" class="nav-calendars w3-bar-item w3-button w3-hide-small w3-hide-medium w3-hover-white">Calendars</a>
+    
+    <div class="w3-hide-small w3-hide-medium" style="float:right; padding: 5px 5px 0 0">
+    <a href="https://capitol.texas.gov/tlodocs/webhelp/tlo.htm#t=default_topic.htm">Help</a> <span aria-hidden="true">|</span>
+    <a href="/resources/FAQ.aspx" title="Frequently asked questions">FAQ</a> <span aria-hidden="true">|</span>
+    <a href="/resources/siteMap.aspx">Site Map</a> <span aria-hidden="true">|</span>
+    <a href="/resources/contactText.aspx">Contact</a> <span aria-hidden="true">|</span>
+    
+        <a href="/MyTLO/Login/login.aspx?ReturnUrl=/Reports/BillsBy.aspx">Login</a>
+        
+  </div>
+    </div>
+</div>
+</nav>
+
+<div id="tloSidebar" style="display: none;">
+<nav aria-description="site navigation" class="w3-sidebar w3-bar-block w3-collapse w3-large w3-theme-l5 w3-animate-left" id="mySidebar">
+  <a href="javascript:void(0)" onclick="w3_close()" class="w3-right w3-xlarge w3-padding-large w3-hover-black w3-hide-large" title="Close Menu" aria-description="Close Menu" arial-label="Close Menu">
+      <img src="/images/close_menu.svg" aria-hidden="true" focusable="false" alt="Menu icon" />
+  </a>
+  <div class="w3-bar-item"><b>Menu</b></div>
+  <ul class="w3-bar-items">
+  <li><a class="w3-button" href="/Home.aspx">Home</a></li>
+  <li><a class="w3-button" href="/MnuMyTLO.aspx">My TLO</a></li>
+  <li><a class="w3-button" href="/MnuHouse.aspx">House</a></li>
+  <li><a class="w3-button" href="/MnuSenate.aspx">Senate</a></li>
+  <li><a class="w3-button" href="/MnuLegislation.aspx">Legislation</a></li>
+  <li><a class="w3-button" href="/MnuSearch.aspx">Search</a></li>
+  <li><a class="w3-button" href="/MnuCommittees.aspx">Committees</a></li>
+  <li><a class="w3-button" href="/MnuCalendars.aspx">Calendars</a></li>
+  </ul>
+  <p></p>
+    <label for="cboSearchLegSessMobile" style="padding-left: 16px;" aria-description="Specify search legislative session">Search:</label>
+    <br />
+  <form method="post" name="search" action="/Search/HeaderSearch.aspx" style="padding-left: 16px">
+    <select id="cboSearchLegSessMobile" name="legSess" CssClass="cboLegSess"><option  value="90R">90(R)</option><option selected="selected" value="892">89(2)</option><option  value="891">89(1)</option><option  value="89R">89(R)</option><option  value="884">88(4)</option><option  value="883">88(3)</option><option  value="882">88(2)</option><option  value="881">88(1)</option><option  value="88R">88(R)</option><option  value="873">87(3)</option><option  value="872">87(2)</option><option  value="871">87(1)</option><option  value="87R">87(R)</option><option  value="86R">86(R)</option><option  value="851">85(1)</option><option  value="85R">85(R)</option><option  value="84R">84(R)</option><option  value="833">83(3)</option><option  value="832">83(2)</option><option  value="831">83(1)</option><option  value="83R">83(R)</option><option  value="821">82(1)</option><option  value="82R">82(R)</option><option  value="811">81(1)</option><option  value="81R">81(R)</option><option  value="80R">80(R)</option><option  value="793">79(3)</option><option  value="792">79(2)</option><option  value="791">79(1)</option><option  value="79R">79(R)</option><option  value="784">78(4)</option><option  value="783">78(3)</option><option  value="782">78(2)</option><option  value="781">78(1)</option><option  value="78R">78(R)</option><option  value="77R">77(R)</option><option  value="76R">76(R)</option><option  value="75R">75(R)</option><option  value="74R">74(R)</option><option  value="73R">73(R)</option><option  value="724">72(4)</option><option  value="723">72(3)</option><option  value="722">72(2)</option><option  value="721">72(1)</option><option  value="72R">72(R)</option><option  value="716">71(6)</option><option  value="715">71(5)</option><option  value="714">71(4)</option><option  value="713">71(3)</option><option  value="712">71(2)</option><option  value="711">71(1)</option><option  value="71R">71(R)</option></select>
+    <label id="txtQueryMobileLabel" for="txtQueryMobile" aria-description="Specify search bill number or text">-</label>
+    <input type="text" id="txtQueryMobile" name="query" style="width:130px" placeholder="Bill or text search" maxlength="30" />
+      <br />
+      <br />
+    <button type="submit" id="btnSubmitSearchMobile" class="search-submit">Go</button>
+  </form>
+    <br/>
+    <div style="margin-left: 16px">
+    <a href="https://capitol.texas.gov/tlodocs/webhelp/tlo.htm#t=default_topic.htm">Help</a> <span aria-hidden="true">|</span>
+    <a href="/resources/FAQ.aspx" title="Frequently asked questions">FAQ</a> <span aria-hidden="true">|</span>
+    <a href="/resources/siteMap.aspx">Site Map</a> <span aria-hidden="true">|</span>
+    <a href="/resources/contactText.aspx">Contact</a> <span aria-hidden="true">|</span>
+
+    
+        <a href="/MyTLO/Login/login.aspx?ReturnUrl=/Reports/BillsBy.aspx">Login</a>
+      
+    </div>
+</nav>
+</div>
+
+		<main class="w3-main" role="main" id="maincontent">
+		<div class="w3-row">
+		<div class="w3-container">
+
+		<form name="Form1" method="post" action="./BillsBy.aspx" id="Form1">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="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" />
+
+
+<script src="/ScriptResource.axd?d=9J5BG5AAkxRNq0QZfb0hRovuzDeYSsv3RoFBmU30dw-RPJrDZlX-cJ3CKsIUd7UUf3mxZWm-ZZ5MYPWTuXNURVm78Nn5A_5Qydf0bWMthCs6tI9E-Sr6fg9ZwZP6ka9_gwASRLLv8WrZNsgXy0_NOO6I05A1&amp;t=5c0e0825" type="text/javascript"></script>
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="4AF38E7D" />
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="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" />
+			<h1>Bills By ... Reports</h1>
+			<p></p>
+		    
+
+						<div class="noPrint">
+							<link href="/Stylesheets/pagetabs.css" type="text/css" rel="stylesheet">
+
+
+    
+<nav role="navigation" aria-label="Related content">
+    <ul role="tablist" class="tabs">
+    
+            <li id="tab-1" 
+                    role="tab" aria-selected="true" 
+                    tabindex="-1" class="tabSelected">
+                <a href="BillsBy.aspx" aria-label="">Bills by ... Reports</a>
+            </li>
+        
+            <li id="tab-2" 
+                    role="tab" aria-selected="false" 
+                    tabindex="-1" class="tabNotSelected">
+                <a href="General.aspx" aria-label="">General Reports</a>
+            </li>
+        
+    </ul>
+</nav>
+	
+<div id="panelLinks">
+
+</div>
+<p></p>
+
+
+						</div>
+						<p></p>
+						
+
+
+							<label for="cboLegSess">Legislature</label>:
+								<select name="cboLegSess" id="cboLegSess">
+	<option value="90R">90(R) - 2027</option>
+	<option selected="selected" value="892">89(2) - 2025</option>
+	<option value="891">89(1) - 2025</option>
+	<option value="89R">89(R) - 2025</option>
+	<option value="884">88(4) - 2023</option>
+	<option value="883">88(3) - 2023</option>
+	<option value="882">88(2) - 2023</option>
+	<option value="881">88(1) - 2023</option>
+	<option value="88R">88(R) - 2023</option>
+	<option value="873">87(3) - 2021</option>
+	<option value="872">87(2) - 2021</option>
+	<option value="871">87(1) - 2021</option>
+	<option value="87R">87(R) - 2021</option>
+	<option value="86R">86(R) - 2019</option>
+	<option value="851">85(1) - 2017</option>
+	<option value="85R">85(R) - 2017</option>
+	<option value="84R">84(R) - 2015</option>
+	<option value="833">83(3) - 2013</option>
+	<option value="832">83(2) - 2013</option>
+	<option value="831">83(1) - 2013</option>
+	<option value="83R">83(R) - 2013</option>
+	<option value="821">82(1) - 2011</option>
+	<option value="82R">82(R) - 2011</option>
+	<option value="811">81(1) - 2009</option>
+	<option value="81R">81(R) - 2009</option>
+	<option value="80R">80(R) - 2007</option>
+	<option value="793">79(3) - 2006</option>
+	<option value="792">79(2) - 2005</option>
+	<option value="791">79(1) - 2005</option>
+	<option value="79R">79(R) - 2005</option>
+	<option value="784">78(4) - 2004</option>
+	<option value="783">78(3) - 2003</option>
+	<option value="782">78(2) - 2003</option>
+	<option value="781">78(1) - 2003</option>
+	<option value="78R">78(R) - 2003</option>
+	<option value="77R">77(R) - 2001</option>
+	<option value="76R">76(R) - 1999</option>
+	<option value="75R">75(R) - 1997</option>
+	<option value="74R">74(R) - 1995</option>
+	<option value="73R">73(R) - 1993</option>
+	<option value="724">72(4) - 1992</option>
+	<option value="723">72(3) - 1992</option>
+	<option value="722">72(2) - 1991</option>
+	<option value="721">72(1) - 1991</option>
+	<option value="72R">72(R) - 1991</option>
+	<option value="716">71(6) - 1990</option>
+	<option value="715">71(5) - 1990</option>
+	<option value="714">71(4) - 1990</option>
+	<option value="713">71(3) - 1990</option>
+	<option value="712">71(2) - 1989</option>
+	<option value="711">71(1) - 1989</option>
+	<option value="71R">71(R) - 1989</option>
+
+</select>
+								<input type="submit" name="btnChangeLegislature" value="Apply" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;btnChangeLegislature&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, false))" id="btnChangeLegislature" />
+								<br/>
+								Use the drop-down lists to choose a report parameter and select its 
+									associated <strong>Go</strong> button to view the report.  Reports open in a new window.
+							<p></p>
+							<label for="cboAuthors">Bills by Author:</label>
+							<br/>
+								<select name="cboAuthors" id="cboAuthors">
+	<option selected="selected" value="none">[Select an author]</option>
+	<option value="A4395">Alders (H-A4395)</option>
+	<option value="A2100">Allen (H-A2100)</option>
+	<option value="A2150">Anch&#237;a (H-A2150)</option>
+	<option value="A2330">Ashby (H-A2330)</option>
+	<option value="A4405">Barry (H-A4405)</option>
+	<option value="A2335">Bell, Cecil (H-A2335)</option>
+	<option value="A3695">Bell, Keith (H-A3695)</option>
+	<option value="A3110">Bernal (H-A3110)</option>
+	<option value="A4115">Bhojani (H-A4115)</option>
+	<option value="A2875">Bonnen (H-A2875)</option>
+	<option value="A3565">Bowers (H-A3565)</option>
+	<option value="A4120">Bryant (H-A4120)</option>
+	<option value="A3585">Buckley (H-A3585)</option>
+	<option value="A3595">Bucy (H-A3595)</option>
+	<option value="A4125">Bumgarner (H-A4125)</option>
+	<option value="A3055">Burrows (H-A3055)</option>
+	<option value="A2510">Button (H-A2510)</option>
+	<option value="A3265">Cain (H-A3265)</option>
+	<option value="A3950">Campos (H-A3950)</option>
+	<option value="A2340">Canales (H-A2340)</option>
+	<option value="A2345">Capriglione (H-A2345)</option>
+	<option value="A3625">Cole (H-A3625)</option>
+	<option value="A2360">Collier (H-A2360)</option>
+	<option value="A3960">Cook (H-A3960)</option>
+	<option value="A2365">Cortez (H-A2365)</option>
+	<option value="A2610">Craddick (H-A2610)</option>
+	<option value="A4130">Cunningham (H-A4130)</option>
+	<option value="A4415">Curry (H-A4415)</option>
+	<option value="A2645">Darby (H-A2645)</option>
+	<option value="A4465">Davis, Aicha (H-A4465)</option>
+	<option value="A2625">Davis, Yvonne (H-A2625)</option>
+	<option value="A3515">Dean (H-A3515)</option>
+	<option value="A4135">DeAyala (H-A4135)</option>
+	<option value="A4145">Dorazio (H-A4145)</option>
+	<option value="A2650">Dutton (H-A2650)</option>
+	<option value="A4475">Dyson (H-A4475)</option>
+	<option value="A4480">Fairly (H-A4480)</option>
+	<option value="A4150">Flores (H-A4150)</option>
+	<option value="A2385">Frank (H-A2385)</option>
+	<option value="A4095">G&#225;mez (H-A4095)</option>
+	<option value="A4495">Garcia Hernandez, Cassandra (H-A4495)</option>
+	<option value="A4170">Garcia, Josey (H-A4170)</option>
+	<option value="A4485">Garcia, Linda (H-A4485)</option>
+	<option value="A3920">Gates (H-A3920)</option>
+	<option value="A4195">Gerdes (H-A4195)</option>
+	<option value="A2945">Geren (H-A2945)</option>
+	<option value="A3445">Gervin-Hawkins (H-A3445)</option>
+	<option value="A3335">Gonz&#225;lez, Jessica (H-A3335)</option>
+	<option value="A2410">Gonz&#225;lez, Mary (H-A2410)</option>
+	<option value="A3820">Goodwin (H-A3820)</option>
+	<option value="A2325">Guerra (H-A2325)</option>
+	<option value="A3045">Guillen (H-A3045)</option>
+	<option value="A3775">Harless (H-A3775)</option>
+	<option value="A3580">Harris (H-A3580)</option>
+	<option value="A4205">Harris Davila (H-A4205)</option>
+	<option value="A4085">Harrison (H-A4085)</option>
+	<option value="A4165">Hayes (H-A4165)</option>
+	<option value="A3505">Hefner (H-A3505)</option>
+	<option value="A3155">Hernandez (H-A3155)</option>
+	<option value="A4520">Hickland (H-A4520)</option>
+	<option value="A3210">Hinojosa (H-A3210)</option>
+	<option value="A4535">Holt (H-A4535)</option>
+	<option value="A4555">Hopper (H-A4555)</option>
+	<option value="A3310">Howard (H-A3310)</option>
+	<option value="A3975">Hull (H-A3975)</option>
+	<option value="A3365">Hunter (H-A3365)</option>
+	<option value="A4265">Isaac (H-A4265)</option>
+	<option value="A3985">Johnson (H-A3985)</option>
+	<option value="A4105">Jones, Jolanda (H-A4105)</option>
+	<option value="A4275">Jones, Venton (H-A4275)</option>
+	<option value="A4575">Kerwin (H-A4575)</option>
+	<option value="A2455">King (H-A2455)</option>
+	<option value="A4280">Kitzman (H-A4280)</option>
+	<option value="A4595">LaHood (H-A4595)</option>
+	<option value="A4285">Lalani (H-A4285)</option>
+	<option value="A3225">Lambert (H-A3225)</option>
+	<option value="A3040">Landgraf (H-A3040)</option>
+	<option value="A2475">Leach (H-A2475)</option>
+	<option value="A4290">Leo Wilson (H-A4290)</option>
+	<option value="A4615">Little (H-A4615)</option>
+	<option value="A2485">Longoria (H-A2485)</option>
+	<option value="A4295">Lopez, Janie (H-A4295)</option>
+	<option value="A3915">Lopez, Ray (H-A3915)</option>
+	<option value="A4620">Louderback (H-A4620)</option>
+	<option value="A4643">Lowe (H-A4643)</option>
+	<option value="A2065">Lozano (H-A2065)</option>
+	<option value="A3145">Lujan (H-A3145)</option>
+	<option value="A4645">Luther (H-A4645)</option>
+	<option value="A4255">Manuel (H-A4255)</option>
+	<option value="A3780">Martinez (H-A3780)</option>
+	<option value="A2835">Martinez Fischer (H-A2835)</option>
+	<option value="A4655">McLaughlin (H-A4655)</option>
+	<option value="A4665">McQueeney (H-A4665)</option>
+	<option value="A2900">Metcalf (H-A2900)</option>
+	<option value="A3075">Meyer (H-A3075)</option>
+	<option value="A3455">Meza (H-A3455)</option>
+	<option value="A4670">Money (H-A4670)</option>
+	<option value="A3850">Moody (H-A3850)</option>
+	<option value="A4035">Morales Shaw (H-A4035)</option>
+	<option value="A3910">Morales, Christina (H-A3910)</option>
+	<option value="A4000">Morales, Eddie (H-A4000)</option>
+	<option value="A4675">Morgan (H-A4675)</option>
+	<option value="A2060">Mu&#241;oz (H-A2060)</option>
+	<option value="A3740">Noble (H-A3740)</option>
+	<option value="A4705">Olcott (H-A4705)</option>
+	<option value="A3535">Oliverson (H-A3535)</option>
+	<option value="A4015">Ordaz (H-A4015)</option>
+	<option value="A4340">Orr (H-A4340)</option>
+	<option value="A3655">Patterson (H-A3655)</option>
+	<option value="A3090">Paul (H-A3090)</option>
+	<option value="A2535">Perez, Mary Ann (H-A2535)</option>
+	<option value="A4710">Perez, Vincent (H-A4710)</option>
+	<option value="A2905">Phelan (H-A2905)</option>
+	<option value="A4715">Pierson (H-A4715)</option>
+	<option value="A4345">Plesa (H-A4345)</option>
+	<option value="A4215">Raymond (H-A4215)</option>
+	<option value="A2040">Reynolds (H-A2040)</option>
+	<option value="A4735">Richardson (H-A4735)</option>
+	<option value="A3735">Rodr&#237;guez Ramos (H-A3735)</option>
+	<option value="A3060">Romero (H-A3060)</option>
+	<option value="A2555">Rose (H-A2555)</option>
+	<option value="A3635">Rosenthal (H-A3635)</option>
+	<option value="A4355">Schatzline (H-A4355)</option>
+	<option value="A3095">Schofield (H-A3095)</option>
+	<option value="A4745">Schoolcraft (H-A4745)</option>
+	<option value="A2995">Shaheen (H-A2995)</option>
+	<option value="A4755">Shofner (H-A4755)</option>
+	<option value="A4765">Simmons (H-A4765)</option>
+	<option value="A4055">Slawson (H-A4055)</option>
+	<option value="A4530">Smithee (H-A4530)</option>
+	<option value="A4075">Spiller (H-A4075)</option>
+	<option value="A3425">Swanson (H-A3425)</option>
+	<option value="A3685">Talarico (H-A3685)</option>
+	<option value="A4360">Tepper (H-A4360)</option>
+	<option value="A4630">Thompson (H-A4630)</option>
+	<option value="A3065">Tinderholt (H-A3065)</option>
+	<option value="A2825">Toth (H-A2825)</option>
+	<option value="A4385">Troxclair (H-A4385)</option>
+	<option value="A4680">Turner (H-A4680)</option>
+	<option value="A2540">VanDeaver (H-A2540)</option>
+	<option value="A4065">Vasut (H-A4065)</option>
+	<option value="A4770">Villalobos (H-A4770)</option>
+	<option value="A4775">Virdell (H-A4775)</option>
+	<option value="A4900">Vo (H-A4900)</option>
+	<option value="A4930">Walle (H-A4930)</option>
+	<option value="A4785">Ward Johnson (H-A4785)</option>
+	<option value="A4795">Wharton (H-A4795)</option>
+	<option value="A3525">Wilson (H-A3525)</option>
+	<option value="A2865">Wu (H-A2865)</option>
+	<option value="A3710">Zwiener (H-A3710)</option>
+	<option value="A1315">Alvarado (S-A1315)</option>
+	<option value="A1055">Bettencourt (S-A1055)</option>
+	<option value="A1080">Birdwell (S-A1080)</option>
+	<option value="A1330">Blanco (S-A1330)</option>
+	<option value="A1010">Campbell (S-A1010)</option>
+	<option value="A1365">Cook (S-A1365)</option>
+	<option value="A1040">Creighton (S-A1040)</option>
+	<option value="A1325">Eckhardt (S-A1325)</option>
+	<option value="A1195">Flores (S-A1195)</option>
+	<option value="A1335">Gutierrez (S-A1335)</option>
+	<option value="A1380">Hagenbuch (S-A1380)</option>
+	<option value="A1050">Hall (S-A1050)</option>
+	<option value="A1015">Hancock (S-A1015)</option>
+	<option value="A1385">Hinojosa, Adam (S-A1385)</option>
+	<option value="A1250">Hinojosa, Juan &quot;Chuy&quot; (S-A1250)</option>
+	<option value="A1260">Huffman (S-A1260)</option>
+	<option value="A1135">Hughes (S-A1135)</option>
+	<option value="A1265">Johnson (S-A1265)</option>
+	<option value="A1345">King (S-A1345)</option>
+	<option value="A1105">Kolkhorst (S-A1105)</option>
+	<option value="A1395">Ligon (S-A1395)</option>
+	<option value="A1110">Men&#233;ndez (S-A1110)</option>
+	<option value="A1350">Middleton (S-A1350)</option>
+	<option value="A1115">Miles (S-A1115)</option>
+	<option value="A1400">Nichols (S-A1400)</option>
+	<option value="A1355">Parker (S-A1355)</option>
+	<option value="A1430">Patrick (S-A1430)</option>
+	<option value="A1285">Paxton (S-A1285)</option>
+	<option value="A1045">Perry (S-A1045)</option>
+	<option value="A1390">Rehmet (S-A1390)</option>
+	<option value="A1025">Schwertner (S-A1025)</option>
+	<option value="A1375">Sparks (S-A1375)</option>
+	<option value="A1625">West (S-A1625)</option>
+	<option value="A1700">Zaffirini (S-A1700)</option>
+
+</select> <input onclick="runReport('cboAuthors','an author')" type="button" value="Go" class="button">
+								
+							<p></p>
+							<label for="cboCoauthors">Bills by Coauthor:</label>
+							<br />
+								<select name="cboCoauthors" id="cboCoauthors">
+	<option selected="selected" value="none">[Select a coauthor]</option>
+	<option value="A4395">Alders (H-A4395)</option>
+	<option value="A2100">Allen (H-A2100)</option>
+	<option value="A2150">Anch&#237;a (H-A2150)</option>
+	<option value="A2330">Ashby (H-A2330)</option>
+	<option value="A4405">Barry (H-A4405)</option>
+	<option value="A2335">Bell, Cecil (H-A2335)</option>
+	<option value="A3695">Bell, Keith (H-A3695)</option>
+	<option value="A3110">Bernal (H-A3110)</option>
+	<option value="A4115">Bhojani (H-A4115)</option>
+	<option value="A2875">Bonnen (H-A2875)</option>
+	<option value="A3565">Bowers (H-A3565)</option>
+	<option value="A4120">Bryant (H-A4120)</option>
+	<option value="A3585">Buckley (H-A3585)</option>
+	<option value="A3595">Bucy (H-A3595)</option>
+	<option value="A4125">Bumgarner (H-A4125)</option>
+	<option value="A3055">Burrows (H-A3055)</option>
+	<option value="A2510">Button (H-A2510)</option>
+	<option value="A3265">Cain (H-A3265)</option>
+	<option value="A3950">Campos (H-A3950)</option>
+	<option value="A2340">Canales (H-A2340)</option>
+	<option value="A2345">Capriglione (H-A2345)</option>
+	<option value="A3625">Cole (H-A3625)</option>
+	<option value="A2360">Collier (H-A2360)</option>
+	<option value="A3960">Cook (H-A3960)</option>
+	<option value="A2365">Cortez (H-A2365)</option>
+	<option value="A2610">Craddick (H-A2610)</option>
+	<option value="A4130">Cunningham (H-A4130)</option>
+	<option value="A4415">Curry (H-A4415)</option>
+	<option value="A2645">Darby (H-A2645)</option>
+	<option value="A4465">Davis, Aicha (H-A4465)</option>
+	<option value="A2625">Davis, Yvonne (H-A2625)</option>
+	<option value="A3515">Dean (H-A3515)</option>
+	<option value="A4135">DeAyala (H-A4135)</option>
+	<option value="A4145">Dorazio (H-A4145)</option>
+	<option value="A2650">Dutton (H-A2650)</option>
+	<option value="A4475">Dyson (H-A4475)</option>
+	<option value="A4480">Fairly (H-A4480)</option>
+	<option value="A4150">Flores (H-A4150)</option>
+	<option value="A2385">Frank (H-A2385)</option>
+	<option value="A4095">G&#225;mez (H-A4095)</option>
+	<option value="A4495">Garcia Hernandez, Cassandra (H-A4495)</option>
+	<option value="A4170">Garcia, Josey (H-A4170)</option>
+	<option value="A4485">Garcia, Linda (H-A4485)</option>
+	<option value="A3920">Gates (H-A3920)</option>
+	<option value="A4195">Gerdes (H-A4195)</option>
+	<option value="A2945">Geren (H-A2945)</option>
+	<option value="A3445">Gervin-Hawkins (H-A3445)</option>
+	<option value="A3335">Gonz&#225;lez, Jessica (H-A3335)</option>
+	<option value="A2410">Gonz&#225;lez, Mary (H-A2410)</option>
+	<option value="A3820">Goodwin (H-A3820)</option>
+	<option value="A2325">Guerra (H-A2325)</option>
+	<option value="A3045">Guillen (H-A3045)</option>
+	<option value="A3775">Harless (H-A3775)</option>
+	<option value="A3580">Harris (H-A3580)</option>
+	<option value="A4205">Harris Davila (H-A4205)</option>
+	<option value="A4085">Harrison (H-A4085)</option>
+	<option value="A4165">Hayes (H-A4165)</option>
+	<option value="A3505">Hefner (H-A3505)</option>
+	<option value="A3155">Hernandez (H-A3155)</option>
+	<option value="A4520">Hickland (H-A4520)</option>
+	<option value="A3210">Hinojosa (H-A3210)</option>
+	<option value="A4535">Holt (H-A4535)</option>
+	<option value="A4555">Hopper (H-A4555)</option>
+	<option value="A3310">Howard (H-A3310)</option>
+	<option value="A3975">Hull (H-A3975)</option>
+	<option value="A3365">Hunter (H-A3365)</option>
+	<option value="A4265">Isaac (H-A4265)</option>
+	<option value="A3985">Johnson (H-A3985)</option>
+	<option value="A4105">Jones, Jolanda (H-A4105)</option>
+	<option value="A4275">Jones, Venton (H-A4275)</option>
+	<option value="A4575">Kerwin (H-A4575)</option>
+	<option value="A2455">King (H-A2455)</option>
+	<option value="A4280">Kitzman (H-A4280)</option>
+	<option value="A4595">LaHood (H-A4595)</option>
+	<option value="A4285">Lalani (H-A4285)</option>
+	<option value="A3225">Lambert (H-A3225)</option>
+	<option value="A3040">Landgraf (H-A3040)</option>
+	<option value="A2475">Leach (H-A2475)</option>
+	<option value="A4290">Leo Wilson (H-A4290)</option>
+	<option value="A4615">Little (H-A4615)</option>
+	<option value="A2485">Longoria (H-A2485)</option>
+	<option value="A4295">Lopez, Janie (H-A4295)</option>
+	<option value="A3915">Lopez, Ray (H-A3915)</option>
+	<option value="A4620">Louderback (H-A4620)</option>
+	<option value="A4643">Lowe (H-A4643)</option>
+	<option value="A2065">Lozano (H-A2065)</option>
+	<option value="A3145">Lujan (H-A3145)</option>
+	<option value="A4645">Luther (H-A4645)</option>
+	<option value="A4255">Manuel (H-A4255)</option>
+	<option value="A3780">Martinez (H-A3780)</option>
+	<option value="A2835">Martinez Fischer (H-A2835)</option>
+	<option value="A4655">McLaughlin (H-A4655)</option>
+	<option value="A4665">McQueeney (H-A4665)</option>
+	<option value="A2900">Metcalf (H-A2900)</option>
+	<option value="A3075">Meyer (H-A3075)</option>
+	<option value="A3455">Meza (H-A3455)</option>
+	<option value="A4670">Money (H-A4670)</option>
+	<option value="A3850">Moody (H-A3850)</option>
+	<option value="A4035">Morales Shaw (H-A4035)</option>
+	<option value="A3910">Morales, Christina (H-A3910)</option>
+	<option value="A4000">Morales, Eddie (H-A4000)</option>
+	<option value="A4675">Morgan (H-A4675)</option>
+	<option value="A2060">Mu&#241;oz (H-A2060)</option>
+	<option value="A3740">Noble (H-A3740)</option>
+	<option value="A4705">Olcott (H-A4705)</option>
+	<option value="A3535">Oliverson (H-A3535)</option>
+	<option value="A4015">Ordaz (H-A4015)</option>
+	<option value="A4340">Orr (H-A4340)</option>
+	<option value="A3655">Patterson (H-A3655)</option>
+	<option value="A3090">Paul (H-A3090)</option>
+	<option value="A2535">Perez, Mary Ann (H-A2535)</option>
+	<option value="A4710">Perez, Vincent (H-A4710)</option>
+	<option value="A2905">Phelan (H-A2905)</option>
+	<option value="A4715">Pierson (H-A4715)</option>
+	<option value="A4345">Plesa (H-A4345)</option>
+	<option value="A4215">Raymond (H-A4215)</option>
+	<option value="A2040">Reynolds (H-A2040)</option>
+	<option value="A4735">Richardson (H-A4735)</option>
+	<option value="A3735">Rodr&#237;guez Ramos (H-A3735)</option>
+	<option value="A3060">Romero (H-A3060)</option>
+	<option value="A2555">Rose (H-A2555)</option>
+	<option value="A3635">Rosenthal (H-A3635)</option>
+	<option value="A4355">Schatzline (H-A4355)</option>
+	<option value="A3095">Schofield (H-A3095)</option>
+	<option value="A4745">Schoolcraft (H-A4745)</option>
+	<option value="A2995">Shaheen (H-A2995)</option>
+	<option value="A4755">Shofner (H-A4755)</option>
+	<option value="A4765">Simmons (H-A4765)</option>
+	<option value="A4055">Slawson (H-A4055)</option>
+	<option value="A4530">Smithee (H-A4530)</option>
+	<option value="A4075">Spiller (H-A4075)</option>
+	<option value="A3425">Swanson (H-A3425)</option>
+	<option value="A3685">Talarico (H-A3685)</option>
+	<option value="A4360">Tepper (H-A4360)</option>
+	<option value="A4630">Thompson (H-A4630)</option>
+	<option value="A3065">Tinderholt (H-A3065)</option>
+	<option value="A2825">Toth (H-A2825)</option>
+	<option value="A4385">Troxclair (H-A4385)</option>
+	<option value="A4680">Turner (H-A4680)</option>
+	<option value="A2540">VanDeaver (H-A2540)</option>
+	<option value="A4065">Vasut (H-A4065)</option>
+	<option value="A4770">Villalobos (H-A4770)</option>
+	<option value="A4775">Virdell (H-A4775)</option>
+	<option value="A4900">Vo (H-A4900)</option>
+	<option value="A4930">Walle (H-A4930)</option>
+	<option value="A4785">Ward Johnson (H-A4785)</option>
+	<option value="A4795">Wharton (H-A4795)</option>
+	<option value="A3525">Wilson (H-A3525)</option>
+	<option value="A2865">Wu (H-A2865)</option>
+	<option value="A3710">Zwiener (H-A3710)</option>
+	<option value="A1315">Alvarado (S-A1315)</option>
+	<option value="A1055">Bettencourt (S-A1055)</option>
+	<option value="A1080">Birdwell (S-A1080)</option>
+	<option value="A1330">Blanco (S-A1330)</option>
+	<option value="A1010">Campbell (S-A1010)</option>
+	<option value="A1365">Cook (S-A1365)</option>
+	<option value="A1040">Creighton (S-A1040)</option>
+	<option value="A1325">Eckhardt (S-A1325)</option>
+	<option value="A1195">Flores (S-A1195)</option>
+	<option value="A1335">Gutierrez (S-A1335)</option>
+	<option value="A1380">Hagenbuch (S-A1380)</option>
+	<option value="A1050">Hall (S-A1050)</option>
+	<option value="A1015">Hancock (S-A1015)</option>
+	<option value="A1385">Hinojosa, Adam (S-A1385)</option>
+	<option value="A1250">Hinojosa, Juan &quot;Chuy&quot; (S-A1250)</option>
+	<option value="A1260">Huffman (S-A1260)</option>
+	<option value="A1135">Hughes (S-A1135)</option>
+	<option value="A1265">Johnson (S-A1265)</option>
+	<option value="A1345">King (S-A1345)</option>
+	<option value="A1105">Kolkhorst (S-A1105)</option>
+	<option value="A1395">Ligon (S-A1395)</option>
+	<option value="A1110">Men&#233;ndez (S-A1110)</option>
+	<option value="A1350">Middleton (S-A1350)</option>
+	<option value="A1115">Miles (S-A1115)</option>
+	<option value="A1400">Nichols (S-A1400)</option>
+	<option value="A1355">Parker (S-A1355)</option>
+	<option value="A1430">Patrick (S-A1430)</option>
+	<option value="A1285">Paxton (S-A1285)</option>
+	<option value="A1045">Perry (S-A1045)</option>
+	<option value="A1390">Rehmet (S-A1390)</option>
+	<option value="A1025">Schwertner (S-A1025)</option>
+	<option value="A1375">Sparks (S-A1375)</option>
+	<option value="A1625">West (S-A1625)</option>
+	<option value="A1700">Zaffirini (S-A1700)</option>
+
+</select> <input onclick="runReport('cboCoauthors',' a coauthor')" type="button" value="Go" class="button">
+								
+						<p></p>
+							<label for="cboSponsors">Bills by Sponsor:</label>
+							<br />
+								<select name="cboSponsors" id="cboSponsors">
+	<option selected="selected" value="none">[Select a sponsor]</option>
+	<option value="A4395">Alders (H-A4395)</option>
+	<option value="A2100">Allen (H-A2100)</option>
+	<option value="A2150">Anch&#237;a (H-A2150)</option>
+	<option value="A2330">Ashby (H-A2330)</option>
+	<option value="A4405">Barry (H-A4405)</option>
+	<option value="A2335">Bell, Cecil (H-A2335)</option>
+	<option value="A3695">Bell, Keith (H-A3695)</option>
+	<option value="A3110">Bernal (H-A3110)</option>
+	<option value="A4115">Bhojani (H-A4115)</option>
+	<option value="A2875">Bonnen (H-A2875)</option>
+	<option value="A3565">Bowers (H-A3565)</option>
+	<option value="A4120">Bryant (H-A4120)</option>
+	<option value="A3585">Buckley (H-A3585)</option>
+	<option value="A3595">Bucy (H-A3595)</option>
+	<option value="A4125">Bumgarner (H-A4125)</option>
+	<option value="A3055">Burrows (H-A3055)</option>
+	<option value="A2510">Button (H-A2510)</option>
+	<option value="A3265">Cain (H-A3265)</option>
+	<option value="A3950">Campos (H-A3950)</option>
+	<option value="A2340">Canales (H-A2340)</option>
+	<option value="A2345">Capriglione (H-A2345)</option>
+	<option value="A3625">Cole (H-A3625)</option>
+	<option value="A2360">Collier (H-A2360)</option>
+	<option value="A3960">Cook (H-A3960)</option>
+	<option value="A2365">Cortez (H-A2365)</option>
+	<option value="A2610">Craddick (H-A2610)</option>
+	<option value="A4130">Cunningham (H-A4130)</option>
+	<option value="A4415">Curry (H-A4415)</option>
+	<option value="A2645">Darby (H-A2645)</option>
+	<option value="A4465">Davis, Aicha (H-A4465)</option>
+	<option value="A2625">Davis, Yvonne (H-A2625)</option>
+	<option value="A3515">Dean (H-A3515)</option>
+	<option value="A4135">DeAyala (H-A4135)</option>
+	<option value="A4145">Dorazio (H-A4145)</option>
+	<option value="A2650">Dutton (H-A2650)</option>
+	<option value="A4475">Dyson (H-A4475)</option>
+	<option value="A4480">Fairly (H-A4480)</option>
+	<option value="A4150">Flores (H-A4150)</option>
+	<option value="A2385">Frank (H-A2385)</option>
+	<option value="A4095">G&#225;mez (H-A4095)</option>
+	<option value="A4495">Garcia Hernandez, Cassandra (H-A4495)</option>
+	<option value="A4170">Garcia, Josey (H-A4170)</option>
+	<option value="A4485">Garcia, Linda (H-A4485)</option>
+	<option value="A3920">Gates (H-A3920)</option>
+	<option value="A4195">Gerdes (H-A4195)</option>
+	<option value="A2945">Geren (H-A2945)</option>
+	<option value="A3445">Gervin-Hawkins (H-A3445)</option>
+	<option value="A3335">Gonz&#225;lez, Jessica (H-A3335)</option>
+	<option value="A2410">Gonz&#225;lez, Mary (H-A2410)</option>
+	<option value="A3820">Goodwin (H-A3820)</option>
+	<option value="A2325">Guerra (H-A2325)</option>
+	<option value="A3045">Guillen (H-A3045)</option>
+	<option value="A3775">Harless (H-A3775)</option>
+	<option value="A3580">Harris (H-A3580)</option>
+	<option value="A4205">Harris Davila (H-A4205)</option>
+	<option value="A4085">Harrison (H-A4085)</option>
+	<option value="A4165">Hayes (H-A4165)</option>
+	<option value="A3505">Hefner (H-A3505)</option>
+	<option value="A3155">Hernandez (H-A3155)</option>
+	<option value="A4520">Hickland (H-A4520)</option>
+	<option value="A3210">Hinojosa (H-A3210)</option>
+	<option value="A4535">Holt (H-A4535)</option>
+	<option value="A4555">Hopper (H-A4555)</option>
+	<option value="A3310">Howard (H-A3310)</option>
+	<option value="A3975">Hull (H-A3975)</option>
+	<option value="A3365">Hunter (H-A3365)</option>
+	<option value="A4265">Isaac (H-A4265)</option>
+	<option value="A3985">Johnson (H-A3985)</option>
+	<option value="A4105">Jones, Jolanda (H-A4105)</option>
+	<option value="A4275">Jones, Venton (H-A4275)</option>
+	<option value="A4575">Kerwin (H-A4575)</option>
+	<option value="A2455">King (H-A2455)</option>
+	<option value="A4280">Kitzman (H-A4280)</option>
+	<option value="A4595">LaHood (H-A4595)</option>
+	<option value="A4285">Lalani (H-A4285)</option>
+	<option value="A3225">Lambert (H-A3225)</option>
+	<option value="A3040">Landgraf (H-A3040)</option>
+	<option value="A2475">Leach (H-A2475)</option>
+	<option value="A4290">Leo Wilson (H-A4290)</option>
+	<option value="A4615">Little (H-A4615)</option>
+	<option value="A2485">Longoria (H-A2485)</option>
+	<option value="A4295">Lopez, Janie (H-A4295)</option>
+	<option value="A3915">Lopez, Ray (H-A3915)</option>
+	<option value="A4620">Louderback (H-A4620)</option>
+	<option value="A4643">Lowe (H-A4643)</option>
+	<option value="A2065">Lozano (H-A2065)</option>
+	<option value="A3145">Lujan (H-A3145)</option>
+	<option value="A4645">Luther (H-A4645)</option>
+	<option value="A4255">Manuel (H-A4255)</option>
+	<option value="A3780">Martinez (H-A3780)</option>
+	<option value="A2835">Martinez Fischer (H-A2835)</option>
+	<option value="A4655">McLaughlin (H-A4655)</option>
+	<option value="A4665">McQueeney (H-A4665)</option>
+	<option value="A2900">Metcalf (H-A2900)</option>
+	<option value="A3075">Meyer (H-A3075)</option>
+	<option value="A3455">Meza (H-A3455)</option>
+	<option value="A4670">Money (H-A4670)</option>
+	<option value="A3850">Moody (H-A3850)</option>
+	<option value="A4035">Morales Shaw (H-A4035)</option>
+	<option value="A3910">Morales, Christina (H-A3910)</option>
+	<option value="A4000">Morales, Eddie (H-A4000)</option>
+	<option value="A4675">Morgan (H-A4675)</option>
+	<option value="A2060">Mu&#241;oz (H-A2060)</option>
+	<option value="A3740">Noble (H-A3740)</option>
+	<option value="A4705">Olcott (H-A4705)</option>
+	<option value="A3535">Oliverson (H-A3535)</option>
+	<option value="A4015">Ordaz (H-A4015)</option>
+	<option value="A4340">Orr (H-A4340)</option>
+	<option value="A3655">Patterson (H-A3655)</option>
+	<option value="A3090">Paul (H-A3090)</option>
+	<option value="A2535">Perez, Mary Ann (H-A2535)</option>
+	<option value="A4710">Perez, Vincent (H-A4710)</option>
+	<option value="A2905">Phelan (H-A2905)</option>
+	<option value="A4715">Pierson (H-A4715)</option>
+	<option value="A4345">Plesa (H-A4345)</option>
+	<option value="A4215">Raymond (H-A4215)</option>
+	<option value="A2040">Reynolds (H-A2040)</option>
+	<option value="A4735">Richardson (H-A4735)</option>
+	<option value="A3735">Rodr&#237;guez Ramos (H-A3735)</option>
+	<option value="A3060">Romero (H-A3060)</option>
+	<option value="A2555">Rose (H-A2555)</option>
+	<option value="A3635">Rosenthal (H-A3635)</option>
+	<option value="A4355">Schatzline (H-A4355)</option>
+	<option value="A3095">Schofield (H-A3095)</option>
+	<option value="A4745">Schoolcraft (H-A4745)</option>
+	<option value="A2995">Shaheen (H-A2995)</option>
+	<option value="A4755">Shofner (H-A4755)</option>
+	<option value="A4765">Simmons (H-A4765)</option>
+	<option value="A4055">Slawson (H-A4055)</option>
+	<option value="A4530">Smithee (H-A4530)</option>
+	<option value="A4075">Spiller (H-A4075)</option>
+	<option value="A3425">Swanson (H-A3425)</option>
+	<option value="A3685">Talarico (H-A3685)</option>
+	<option value="A4360">Tepper (H-A4360)</option>
+	<option value="A4630">Thompson (H-A4630)</option>
+	<option value="A3065">Tinderholt (H-A3065)</option>
+	<option value="A2825">Toth (H-A2825)</option>
+	<option value="A4385">Troxclair (H-A4385)</option>
+	<option value="A4680">Turner (H-A4680)</option>
+	<option value="A2540">VanDeaver (H-A2540)</option>
+	<option value="A4065">Vasut (H-A4065)</option>
+	<option value="A4770">Villalobos (H-A4770)</option>
+	<option value="A4775">Virdell (H-A4775)</option>
+	<option value="A4900">Vo (H-A4900)</option>
+	<option value="A4930">Walle (H-A4930)</option>
+	<option value="A4785">Ward Johnson (H-A4785)</option>
+	<option value="A4795">Wharton (H-A4795)</option>
+	<option value="A3525">Wilson (H-A3525)</option>
+	<option value="A2865">Wu (H-A2865)</option>
+	<option value="A3710">Zwiener (H-A3710)</option>
+	<option value="A1315">Alvarado (S-A1315)</option>
+	<option value="A1055">Bettencourt (S-A1055)</option>
+	<option value="A1080">Birdwell (S-A1080)</option>
+	<option value="A1330">Blanco (S-A1330)</option>
+	<option value="A1010">Campbell (S-A1010)</option>
+	<option value="A1365">Cook (S-A1365)</option>
+	<option value="A1040">Creighton (S-A1040)</option>
+	<option value="A1325">Eckhardt (S-A1325)</option>
+	<option value="A1195">Flores (S-A1195)</option>
+	<option value="A1335">Gutierrez (S-A1335)</option>
+	<option value="A1380">Hagenbuch (S-A1380)</option>
+	<option value="A1050">Hall (S-A1050)</option>
+	<option value="A1015">Hancock (S-A1015)</option>
+	<option value="A1385">Hinojosa, Adam (S-A1385)</option>
+	<option value="A1250">Hinojosa, Juan &quot;Chuy&quot; (S-A1250)</option>
+	<option value="A1260">Huffman (S-A1260)</option>
+	<option value="A1135">Hughes (S-A1135)</option>
+	<option value="A1265">Johnson (S-A1265)</option>
+	<option value="A1345">King (S-A1345)</option>
+	<option value="A1105">Kolkhorst (S-A1105)</option>
+	<option value="A1395">Ligon (S-A1395)</option>
+	<option value="A1110">Men&#233;ndez (S-A1110)</option>
+	<option value="A1350">Middleton (S-A1350)</option>
+	<option value="A1115">Miles (S-A1115)</option>
+	<option value="A1400">Nichols (S-A1400)</option>
+	<option value="A1355">Parker (S-A1355)</option>
+	<option value="A1430">Patrick (S-A1430)</option>
+	<option value="A1285">Paxton (S-A1285)</option>
+	<option value="A1045">Perry (S-A1045)</option>
+	<option value="A1390">Rehmet (S-A1390)</option>
+	<option value="A1025">Schwertner (S-A1025)</option>
+	<option value="A1375">Sparks (S-A1375)</option>
+	<option value="A1625">West (S-A1625)</option>
+	<option value="A1700">Zaffirini (S-A1700)</option>
+
+</select> <input onclick="runReport('cboSponsors','a sponsor')" type="button" value="Go" class="button">
+								
+						<p></p>
+						<label for="cboCosponsors">Bills by Cosponsor:</label>
+						<br />
+						<select name="cboCosponsors" id="cboCosponsors">
+	<option selected="selected" value="none">[Select a cosponsor]</option>
+	<option value="A4395">Alders (H-A4395)</option>
+	<option value="A2100">Allen (H-A2100)</option>
+	<option value="A2150">Anch&#237;a (H-A2150)</option>
+	<option value="A2330">Ashby (H-A2330)</option>
+	<option value="A4405">Barry (H-A4405)</option>
+	<option value="A2335">Bell, Cecil (H-A2335)</option>
+	<option value="A3695">Bell, Keith (H-A3695)</option>
+	<option value="A3110">Bernal (H-A3110)</option>
+	<option value="A4115">Bhojani (H-A4115)</option>
+	<option value="A2875">Bonnen (H-A2875)</option>
+	<option value="A3565">Bowers (H-A3565)</option>
+	<option value="A4120">Bryant (H-A4120)</option>
+	<option value="A3585">Buckley (H-A3585)</option>
+	<option value="A3595">Bucy (H-A3595)</option>
+	<option value="A4125">Bumgarner (H-A4125)</option>
+	<option value="A3055">Burrows (H-A3055)</option>
+	<option value="A2510">Button (H-A2510)</option>
+	<option value="A3265">Cain (H-A3265)</option>
+	<option value="A3950">Campos (H-A3950)</option>
+	<option value="A2340">Canales (H-A2340)</option>
+	<option value="A2345">Capriglione (H-A2345)</option>
+	<option value="A3625">Cole (H-A3625)</option>
+	<option value="A2360">Collier (H-A2360)</option>
+	<option value="A3960">Cook (H-A3960)</option>
+	<option value="A2365">Cortez (H-A2365)</option>
+	<option value="A2610">Craddick (H-A2610)</option>
+	<option value="A4130">Cunningham (H-A4130)</option>
+	<option value="A4415">Curry (H-A4415)</option>
+	<option value="A2645">Darby (H-A2645)</option>
+	<option value="A4465">Davis, Aicha (H-A4465)</option>
+	<option value="A2625">Davis, Yvonne (H-A2625)</option>
+	<option value="A3515">Dean (H-A3515)</option>
+	<option value="A4135">DeAyala (H-A4135)</option>
+	<option value="A4145">Dorazio (H-A4145)</option>
+	<option value="A2650">Dutton (H-A2650)</option>
+	<option value="A4475">Dyson (H-A4475)</option>
+	<option value="A4480">Fairly (H-A4480)</option>
+	<option value="A4150">Flores (H-A4150)</option>
+	<option value="A2385">Frank (H-A2385)</option>
+	<option value="A4095">G&#225;mez (H-A4095)</option>
+	<option value="A4495">Garcia Hernandez, Cassandra (H-A4495)</option>
+	<option value="A4170">Garcia, Josey (H-A4170)</option>
+	<option value="A4485">Garcia, Linda (H-A4485)</option>
+	<option value="A3920">Gates (H-A3920)</option>
+	<option value="A4195">Gerdes (H-A4195)</option>
+	<option value="A2945">Geren (H-A2945)</option>
+	<option value="A3445">Gervin-Hawkins (H-A3445)</option>
+	<option value="A3335">Gonz&#225;lez, Jessica (H-A3335)</option>
+	<option value="A2410">Gonz&#225;lez, Mary (H-A2410)</option>
+	<option value="A3820">Goodwin (H-A3820)</option>
+	<option value="A2325">Guerra (H-A2325)</option>
+	<option value="A3045">Guillen (H-A3045)</option>
+	<option value="A3775">Harless (H-A3775)</option>
+	<option value="A3580">Harris (H-A3580)</option>
+	<option value="A4205">Harris Davila (H-A4205)</option>
+	<option value="A4085">Harrison (H-A4085)</option>
+	<option value="A4165">Hayes (H-A4165)</option>
+	<option value="A3505">Hefner (H-A3505)</option>
+	<option value="A3155">Hernandez (H-A3155)</option>
+	<option value="A4520">Hickland (H-A4520)</option>
+	<option value="A3210">Hinojosa (H-A3210)</option>
+	<option value="A4535">Holt (H-A4535)</option>
+	<option value="A4555">Hopper (H-A4555)</option>
+	<option value="A3310">Howard (H-A3310)</option>
+	<option value="A3975">Hull (H-A3975)</option>
+	<option value="A3365">Hunter (H-A3365)</option>
+	<option value="A4265">Isaac (H-A4265)</option>
+	<option value="A3985">Johnson (H-A3985)</option>
+	<option value="A4105">Jones, Jolanda (H-A4105)</option>
+	<option value="A4275">Jones, Venton (H-A4275)</option>
+	<option value="A4575">Kerwin (H-A4575)</option>
+	<option value="A2455">King (H-A2455)</option>
+	<option value="A4280">Kitzman (H-A4280)</option>
+	<option value="A4595">LaHood (H-A4595)</option>
+	<option value="A4285">Lalani (H-A4285)</option>
+	<option value="A3225">Lambert (H-A3225)</option>
+	<option value="A3040">Landgraf (H-A3040)</option>
+	<option value="A2475">Leach (H-A2475)</option>
+	<option value="A4290">Leo Wilson (H-A4290)</option>
+	<option value="A4615">Little (H-A4615)</option>
+	<option value="A2485">Longoria (H-A2485)</option>
+	<option value="A4295">Lopez, Janie (H-A4295)</option>
+	<option value="A3915">Lopez, Ray (H-A3915)</option>
+	<option value="A4620">Louderback (H-A4620)</option>
+	<option value="A4643">Lowe (H-A4643)</option>
+	<option value="A2065">Lozano (H-A2065)</option>
+	<option value="A3145">Lujan (H-A3145)</option>
+	<option value="A4645">Luther (H-A4645)</option>
+	<option value="A4255">Manuel (H-A4255)</option>
+	<option value="A3780">Martinez (H-A3780)</option>
+	<option value="A2835">Martinez Fischer (H-A2835)</option>
+	<option value="A4655">McLaughlin (H-A4655)</option>
+	<option value="A4665">McQueeney (H-A4665)</option>
+	<option value="A2900">Metcalf (H-A2900)</option>
+	<option value="A3075">Meyer (H-A3075)</option>
+	<option value="A3455">Meza (H-A3455)</option>
+	<option value="A4670">Money (H-A4670)</option>
+	<option value="A3850">Moody (H-A3850)</option>
+	<option value="A4035">Morales Shaw (H-A4035)</option>
+	<option value="A3910">Morales, Christina (H-A3910)</option>
+	<option value="A4000">Morales, Eddie (H-A4000)</option>
+	<option value="A4675">Morgan (H-A4675)</option>
+	<option value="A2060">Mu&#241;oz (H-A2060)</option>
+	<option value="A3740">Noble (H-A3740)</option>
+	<option value="A4705">Olcott (H-A4705)</option>
+	<option value="A3535">Oliverson (H-A3535)</option>
+	<option value="A4015">Ordaz (H-A4015)</option>
+	<option value="A4340">Orr (H-A4340)</option>
+	<option value="A3655">Patterson (H-A3655)</option>
+	<option value="A3090">Paul (H-A3090)</option>
+	<option value="A2535">Perez, Mary Ann (H-A2535)</option>
+	<option value="A4710">Perez, Vincent (H-A4710)</option>
+	<option value="A2905">Phelan (H-A2905)</option>
+	<option value="A4715">Pierson (H-A4715)</option>
+	<option value="A4345">Plesa (H-A4345)</option>
+	<option value="A4215">Raymond (H-A4215)</option>
+	<option value="A2040">Reynolds (H-A2040)</option>
+	<option value="A4735">Richardson (H-A4735)</option>
+	<option value="A3735">Rodr&#237;guez Ramos (H-A3735)</option>
+	<option value="A3060">Romero (H-A3060)</option>
+	<option value="A2555">Rose (H-A2555)</option>
+	<option value="A3635">Rosenthal (H-A3635)</option>
+	<option value="A4355">Schatzline (H-A4355)</option>
+	<option value="A3095">Schofield (H-A3095)</option>
+	<option value="A4745">Schoolcraft (H-A4745)</option>
+	<option value="A2995">Shaheen (H-A2995)</option>
+	<option value="A4755">Shofner (H-A4755)</option>
+	<option value="A4765">Simmons (H-A4765)</option>
+	<option value="A4055">Slawson (H-A4055)</option>
+	<option value="A4530">Smithee (H-A4530)</option>
+	<option value="A4075">Spiller (H-A4075)</option>
+	<option value="A3425">Swanson (H-A3425)</option>
+	<option value="A3685">Talarico (H-A3685)</option>
+	<option value="A4360">Tepper (H-A4360)</option>
+	<option value="A4630">Thompson (H-A4630)</option>
+	<option value="A3065">Tinderholt (H-A3065)</option>
+	<option value="A2825">Toth (H-A2825)</option>
+	<option value="A4385">Troxclair (H-A4385)</option>
+	<option value="A4680">Turner (H-A4680)</option>
+	<option value="A2540">VanDeaver (H-A2540)</option>
+	<option value="A4065">Vasut (H-A4065)</option>
+	<option value="A4770">Villalobos (H-A4770)</option>
+	<option value="A4775">Virdell (H-A4775)</option>
+	<option value="A4900">Vo (H-A4900)</option>
+	<option value="A4930">Walle (H-A4930)</option>
+	<option value="A4785">Ward Johnson (H-A4785)</option>
+	<option value="A4795">Wharton (H-A4795)</option>
+	<option value="A3525">Wilson (H-A3525)</option>
+	<option value="A2865">Wu (H-A2865)</option>
+	<option value="A3710">Zwiener (H-A3710)</option>
+	<option value="A1315">Alvarado (S-A1315)</option>
+	<option value="A1055">Bettencourt (S-A1055)</option>
+	<option value="A1080">Birdwell (S-A1080)</option>
+	<option value="A1330">Blanco (S-A1330)</option>
+	<option value="A1010">Campbell (S-A1010)</option>
+	<option value="A1365">Cook (S-A1365)</option>
+	<option value="A1040">Creighton (S-A1040)</option>
+	<option value="A1325">Eckhardt (S-A1325)</option>
+	<option value="A1195">Flores (S-A1195)</option>
+	<option value="A1335">Gutierrez (S-A1335)</option>
+	<option value="A1380">Hagenbuch (S-A1380)</option>
+	<option value="A1050">Hall (S-A1050)</option>
+	<option value="A1015">Hancock (S-A1015)</option>
+	<option value="A1385">Hinojosa, Adam (S-A1385)</option>
+	<option value="A1250">Hinojosa, Juan &quot;Chuy&quot; (S-A1250)</option>
+	<option value="A1260">Huffman (S-A1260)</option>
+	<option value="A1135">Hughes (S-A1135)</option>
+	<option value="A1265">Johnson (S-A1265)</option>
+	<option value="A1345">King (S-A1345)</option>
+	<option value="A1105">Kolkhorst (S-A1105)</option>
+	<option value="A1395">Ligon (S-A1395)</option>
+	<option value="A1110">Men&#233;ndez (S-A1110)</option>
+	<option value="A1350">Middleton (S-A1350)</option>
+	<option value="A1115">Miles (S-A1115)</option>
+	<option value="A1400">Nichols (S-A1400)</option>
+	<option value="A1355">Parker (S-A1355)</option>
+	<option value="A1430">Patrick (S-A1430)</option>
+	<option value="A1285">Paxton (S-A1285)</option>
+	<option value="A1045">Perry (S-A1045)</option>
+	<option value="A1390">Rehmet (S-A1390)</option>
+	<option value="A1025">Schwertner (S-A1025)</option>
+	<option value="A1375">Sparks (S-A1375)</option>
+	<option value="A1625">West (S-A1625)</option>
+	<option value="A1700">Zaffirini (S-A1700)</option>
+
+</select> <input onclick="runReport('cboCosponsors','a cosponsor')" type="button" value="Go" class="button">
+								
+						<p></p>
+						<label for="cboHouseCommittees">Bills by House Committee:</label>
+						<br />
+						<select name="cboHouseCommittees" id="cboHouseCommittees">
+	<option selected="selected" value="none">[Select a house committee]</option>
+	<option value="C020">Agriculture &amp; Livestock (H-C020)</option>
+	<option value="C030">Appropriations (H-C030)</option>
+	<option value="C010">Appropriations - S/C on Article II (H-C010)</option>
+	<option value="C012">Appropriations - S/C on Article III (H-C012)</option>
+	<option value="C013">Appropriations - S/C on Articles I, IV, &amp; V (H-C013)</option>
+	<option value="C014">Appropriations - S/C on Articles VI, VII, &amp; VIII (H-C014)</option>
+	<option value="C050">Calendars (H-C050)</option>
+	<option value="C052">Civil Discourse &amp; Freedom of Speech in Higher Ed, Select (H-C052)</option>
+	<option value="C055">Congressional Redistricting, Select (H-C055)</option>
+	<option value="C200">Corrections (H-C200)</option>
+	<option value="C220">Criminal Jurisprudence (H-C220)</option>
+	<option value="C221">S/C on Juvenile Justice (H-C221)</option>
+	<option value="C430">Culture, Recreation &amp; Tourism (H-C430)</option>
+	<option value="C233">Delivery of Government Efficiency (H-C233)</option>
+	<option value="C236">Disaster Preparedness &amp; Flooding, Select (H-C236)</option>
+	<option value="C240">Elections (H-C240)</option>
+	<option value="C250">Energy Resources (H-C250)</option>
+	<option value="C260">Environmental Regulation (H-C260)</option>
+	<option value="C023">General Aviation, Select (H-C023)</option>
+	<option value="C280">General Investigating (H-C280)</option>
+	<option value="C075">Governmental Oversight, Select (H-C075)</option>
+	<option value="C059">Health Care Affordability, Select (H-C059)</option>
+	<option value="C290">Higher Education (H-C290)</option>
+	<option value="C308">Homeland Security, Public Safety &amp; Veterans&#39; Affairs (H-C308)</option>
+	<option value="C309">S/C on Defense &amp; Veterans&#39; Affairs (H-C309)</option>
+	<option value="C300">House Administration (H-C300)</option>
+	<option value="C310">Human Services (H-C310)</option>
+	<option value="C320">Insurance (H-C320)</option>
+	<option value="C324">Intergovernmental Affairs (H-C324)</option>
+	<option value="C326">S/C on County &amp; Regional Government (H-C326)</option>
+	<option value="C327">S/C on State-Federal Relations (H-C327)</option>
+	<option value="C330">Judiciary &amp; Civil Jurisprudence (H-C330)</option>
+	<option value="C332">S/C on Family &amp; Fiduciary Relationships (H-C332)</option>
+	<option value="C360">Land &amp; Resource Management (H-C360)</option>
+	<option value="C350">Licensing &amp; Administrative Procedures (H-C350)</option>
+	<option value="C380">Local &amp; Consent Calendars (H-C380)</option>
+	<option value="C390">Natural Resources (H-C390)</option>
+	<option value="C395">Pensions, Investments &amp; Financial Services (H-C395)</option>
+	<option value="C400">Public Education (H-C400)</option>
+	<option value="C403">S/C on Academic &amp; Career-Oriented Education (H-C403)</option>
+	<option value="C410">Public Health (H-C410)</option>
+	<option value="C412">S/C on Disease Prevention &amp; Women&#39;s &amp; Children&#39;s Health (H-C412)</option>
+	<option value="C413">S/C-Maternal Hlth/Menopause/Access-Evidence-Based Medicine (H-C413)</option>
+	<option value="C080">Redistricting (H-C080)</option>
+	<option value="C450">State Affairs (H-C450)</option>
+	<option value="C452">S/C on Telecommunications &amp; Broadband (H-C452)</option>
+	<option value="C355">The July 2025 Flooding Events, General Investigating (H-C355)</option>
+	<option value="C473">Trade, Workforce &amp; Economic Development (H-C473)</option>
+	<option value="C478">S/C on International Relations (H-C478)</option>
+	<option value="C477">S/C on Workforce (H-C477)</option>
+	<option value="C470">Transportation (H-C470)</option>
+	<option value="C479">S/C on Transportation Funding (H-C479)</option>
+	<option value="C490">Ways &amp; Means (H-C490)</option>
+	<option value="C492">S/C on Property Tax Appraisals (H-C492)</option>
+
+</select> <input onclick="runReport('cboHouseCommittees','a committee')" type="button" value="Go" class="button">&nbsp;
+								
+						<p></p>
+						<label for="cboSenateCommittees">Bills by Senate Committee:</label>
+						<br />
+						<select name="cboSenateCommittees" id="cboSenateCommittees">
+	<option selected="selected" value="none">[Select a senate committee]</option>
+	<option value="C500">Administration (S-C500)</option>
+	<option value="C517">Border Security (S-C517)</option>
+	<option value="C510">Business &amp; Commerce (S-C510)</option>
+	<option value="C518">Civil Discourse &amp; Freedom of Speech in Higher Ed, Select (S-C518)</option>
+	<option value="C600">Committee of the Whole Senate (S-C600)</option>
+	<option value="C660">Congressional Redistricting, Special (S-C660)</option>
+	<option value="C590">Criminal Justice (S-C590)</option>
+	<option value="C519">Disaster Preparedness &amp; Flooding, Select (S-C519)</option>
+	<option value="C525">Economic Development (S-C525)</option>
+	<option value="C530">Education (S-C530)</option>
+	<option value="C532">Education K-16 (S-C532)</option>
+	<option value="C540">Finance (S-C540)</option>
+	<option value="C610">Health &amp; Human Services (S-C610)</option>
+	<option value="C560">Higher Education (S-C560)</option>
+	<option value="C594">Homeland &amp; Border Security, Select (S-C594)</option>
+	<option value="C546">July 2025 Flooding Events, General Investigating (S-C546)</option>
+	<option value="C550">Jurisprudence (S-C550)</option>
+	<option value="C556">Local Government (S-C556)</option>
+	<option value="C580">Natural Resources (S-C580)</option>
+	<option value="C572">Nominations (S-C572)</option>
+	<option value="C678">Religious Liberty, Select (S-C678)</option>
+	<option value="C570">State Affairs (S-C570)</option>
+	<option value="C640">Transportation (S-C640)</option>
+	<option value="C650">Veteran Affairs (S-C650)</option>
+	<option value="C658">Veteran Affairs, Select (S-C658)</option>
+	<option value="C700">Water, Agriculture and Rural Affairs (S-C700)</option>
+
+</select> <input onclick="runReport('cboSenateCommittees',' a committee')" type="button" value="Go" class="button">
+								
+						<p></p>			
+						<label for="cboSubjectCategory">Bills by Subject:</label>
+						<br />
+								<select name="cboSubjectCategory" id="cboSubjectCategory">
+	<option selected="selected" value="none">[Select a category]</option>
+	<option value="A">A - Legislators</option>
+	<option value="D">D - Special Districts</option>
+	<option value="E">E - Primary/Secondary Schools</option>
+	<option value="G">G - Geographical Areas</option>
+	<option value="H">H - Holidays, Special Days and Observances</option>
+	<option value="I">I - General Subject Index</option>
+	<option value="N">N - Proper Nouns</option>
+	<option value="P">P - Popular Names of Acts</option>
+	<option value="S">S - Subject Headings</option>
+	<option value="U">U - Universities and Colleges</option>
+	<option value="V">V - Governmental Agencies</option>
+
+</select> <input onclick="runReport('cboSubjectCategory','a subject category')" type="button" value="Go" class="button">
+								
+				
+						<p></p>
+				
+						<label for="dtFilingDate">Bills by Filing Date:</label>
+						<br />
+						<input name="dtFilingDate" id="dtFilingDate" Min="2024-01-01" Max="2027-01-01" Value="2025-01-01" type="date" />
+						<input onclick="runReport('dtFilingDate','a filing date')" type="button" id="btnFilingGo"
+								value="Go" class="button"/>
+							
+
+						<p></p>
+							
+						<label for="dtFirstOnIntentDate">First on Intent:</label>
+						<br />
+						<input name="dtFirstOnIntentDate" id="dtFirstOnIntentDate" Min="2024-01-01" Max="2027-01-01" Value="2025-01-01" type="date" />
+						<input onclick="runReport('dtFirstOnIntentDate','a first on intent date')" type="button" id="btnGoFirstOnIntentDate"
+								value="Go" class="button"/>
+							
+						
+						<p></p>
+
+						<label for="dtHouseReferralDate">House Referrals:</label>
+						<br />
+						<input name="dtHouseReferralDate" id="dtHouseReferralDate" Min="2024-01-01" Max="2027-01-01" Value="2025-01-01" type="date" />
+						<input onclick="runReport('dtHouseReferralDate','a house referral date')" type="button" id="btnHouseReferralDate"
+								value="Go" class="button"/>
+							
+
+						<p></p>
+
+						<label for="dtSenateReferralDate">Senate Referrals:</label>
+						<br />
+						<input name="dtSenateReferralDate" id="dtSenateReferralDate" Min="2024-01-01" Max="2027-01-01" Value="2025-01-01" type="date" />
+						<input onclick="runReport('dtSenateReferralDate','a senate referral date')" type="button" id="btnSenateReferralDate"
+								value="Go" class="button"/>
+							
+						<p></p>
+						<input type="submit" name="btnReset" value="Reset" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;btnReset&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, false))" id="btnReset" class="button" />	
+		</form>
+		</div>
+		</div>
+		</main>
+		
+<p></p>
+<footer class="l-footer" aria-label="Footer navigation">
+  		<div class="row">
+  			<div style="text-align:center">
+  				<ul class="footer">
+                <li><a href="/Home.aspx" aria-label="Home footer menu item">Home</a></li>
+                <li><a href="/MnuMyTLO.aspx" aria-label="My TLO footer menu item">My TLO</a></li>
+                <li><a href="/MnuHouse.aspx" aria-label="House footer menu item">House</a></li>
+                <li><a href="/MnuSenate.aspx" aria-label="Senate footer menu item">Senate</a></li>
+                <li><a href="/MnuLegislation.aspx" aria-label="Legislation footer menu item">Legislation</a></li>
+                <li><a href="/MnuSearch.aspx" aria-label="Search footer menu item">Search</a></li>
+                <li><a href="/MnuCommittees.aspx" aria-label="Committees footer menu item">Committees</a></li>
+                <li><a href="/MnuCalendars.aspx" aria-label="Calendars footer menu item">Calendars</a></li>
+                <li><a href="#top">Top</a></li>
+  				</ul>
+  			</div>
+
+  			<div class="columns">
+  				<hr>
+  			</div>
+  		</div>
+  		<div class="row">
+  			<div style="text-align:center">
+                <ul class="footer">
+				
+              <li><a href="/resources/policies.aspx">Policies</a></li>				
+              <li><a href="/resources/accessibility.aspx">Accessibility</a></li>   
+			  			  			                                           
+  			  </ul>
+  			</div>
+  		</div>
+</footer>
+
+
+
+
+<script src="/scripts/sideMenu.js" type="text/javascript"></script>
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-0PD42KC8G7"></script>
+
+<script  type="text/javascript">
+window.dataLayer = window.dataLayer || [];
+function gtag() { dataLayer.push(arguments); }
+gtag('js', new Date());
+gtag('config', 'G-0PD42KC8G7');
+</script>
+
+
+	</body>
+</html>
