@@ -33,7 +33,7 @@ jobs:
       - run: npm run build
 
   edge-functions:
-    name: Deno check and test Edge Functions
+    name: Deno check Edge Functions
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
