@@ -543,6 +543,8 @@ Deno.test("G2: Sync on the live House calendars feed between sessions writes no 
   assertEquals(unknown.written, []);
   assert(unknown.log.notes.some((note) => note.includes("1 of 1 items are not in the format the parser reads")));
   assertEquals(unknown.log.notes.some((note) => note.includes("no longer listed")), false);
+  // Nor is it described as TLO having posted no floor calendars (Bugbot, PR #13).
+  assertEquals(unknown.log.notes.some((note) => note.includes("floor calendars are posted")), false);
 });
 
 Deno.test("G3: the Senate floor schedule's next meeting is read, and Eastern time becomes Central", async () => {

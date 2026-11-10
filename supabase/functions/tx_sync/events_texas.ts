@@ -153,7 +153,9 @@ export async function texasFloor(ctx: Ctx, p: Politician) {
   ctx.log.notes.push(...feedNotes(type, check, `${chamberName} calendars`));
   const from = eventsFrom(ctx, p);
   const calendars = parseCalendarFeed(res.text, chamber).filter((day) => day.date >= from);
-  if (calendars.length === 0 && !check.nothingPosted) {
+  // Only when the feed lists items the parser read, none of them a floor calendar from `from` on; the
+  // "nothing posted" item and unread items have their own notes above.
+  if (calendars.length === 0 && !check.nothingPosted && check.unrecognized.length === 0) {
     ctx.log.notes.push(`Texas Legislature Online: no ${chamberName} floor calendars are posted for ${p.name} yet (from ${from}).`);
   }
   // A feed with items the parser could not read is not the whole list, so nothing is noted as no longer listed.
