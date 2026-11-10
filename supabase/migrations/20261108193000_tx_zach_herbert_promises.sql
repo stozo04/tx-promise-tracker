@@ -32,9 +32,9 @@ insert into tx_tracker.politicians (
   '1961023791137779712',
   'https://zach4texas.com/',
   'elect',
-  'https://zach4texas.com/wp-content/uploads/2025/09/Profile-Pic.jpg',
+  '/portraits/zach-herbert.webp',
   'Photo: Zach Herbert for Texas campaign',
-  'https://zach4texas.com/'
+  'https://x.com/Zach4Texas/photo'
 )
 on conflict (slug) do update set
   name = excluded.name,
