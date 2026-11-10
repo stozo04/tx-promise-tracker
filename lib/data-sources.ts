@@ -49,7 +49,7 @@ export const DATA_SOURCES: DataSource[] = [
     what: "Bills, who filed them, their history, whether the governor signed or vetoed them, and the House and Senate floor calendars and committee meeting notices on the Events calendar",
     how: "Official bill records and TLO's feeds of upcoming calendars and meetings, checked on each sync",
     why: "It is the Legislature's own record of every bill",
-    href: "https://capitol.texas.gov",
+    href: "https://capitol.texas.gov/Home.aspx",
     linkText: "capitol.texas.gov",
     state: "live",
     offices: ["governor", "tx_lt_governor", "tx_house"],
