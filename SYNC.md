@@ -67,7 +67,7 @@ record it was copied from. Every lookup uses an ID stored for the official, neve
 | **Campaign sites** | `{origin}/sitemap.xml` (two levels, up to 600 URLs) plus `politicians.campaign_watch_urls`, then every page in batches of 100 | Every official with a campaign site | URL | `tx_watched_pages`, `tx_topic_findings` (`page`) |
 | **X API** (`api.x.com/2`) | `users/{x_user_id}/tweets` (100 posts, no retweets) | Officials with `x_user_id` | `x_user_id` | `tx_topic_findings` (`post`) |
 | **Dates set by law** (`tcss.legis.texas.gov/resources`, the file server behind statutes.capitol.texas.gov; senate.gov's Constitution page) | `GV/htm/GV.301.htm`, `CN/htm/CN.3.htm`, `CN/htm/CN.4.htm`; the 20th Amendment | Every office, for the regular session that is upcoming | The office | `tx_upcoming_events` (`session_day`, `deadline`) |
-| **Texas Legislature Online** calendars (`MyTLO/RSS/RSS.aspx`) | `Type=upcomingcalendarshouse` or `upcomingcalendarssenate` | `tx_house` (House), `tx_lt_governor` (Senate), from `term_start` | The chamber | `tx_upcoming_events` (`floor_vote`) |
+| **Texas Legislature Online** calendars (`MyTLO/RSS/RSS.aspx`), the lists behind TLO's House Calendars page (`Calendars/CalendarsHouse.aspx`) and Senate Calendars page | `Type=upcomingcalendarshouse` or `upcomingcalendarssenate` | `tx_house` (House), `tx_lt_governor` (Senate), from `term_start` | The chamber | `tx_upcoming_events` (`floor_vote`) |
 | **Texas Legislature Online** committee meetings | `Members/MemberInfo.aspx` for the member's committees, then `Type=upcomingmeetingshouse` and `upcomingmeetingsjoint` | `tx_house`, from `term_start` | `tx_legislative_service.tlo_member_code`, then committee code | `tx_committee_memberships`, `tx_upcoming_events` (`committee_hearing`) |
 | **U.S. Senate** schedules (senate.gov) | `legislative/schedule/floor_schedule.htm` (next meeting) and `legislative/{year}_schedule.xml` (tentative schedule) | `us_senate`, from `term_start` | The office | `tx_upcoming_events` (`session_day`) |
 | **U.S. Senate** committee hearings | `legislative/LIS_MEMBER/cvc_member_data.xml` for the senator's committees, then `general/committee_schedules/hearings.xml` | `us_senate`, from `term_start` | `politicians.bioguide_id`, then committee code | `tx_committee_memberships`, `tx_upcoming_events` (`committee_hearing`) |
@@ -135,6 +135,26 @@ checked with real requests on 2026-11-09 before the parsers were written:
   (`tlodocs/88R/schedules/html/C4102023032708001.htm` is committee C410 on 2023-03-27 at 8:00). Between
   sessions the feeds say "No committee meetings scheduled." and "No calendars are available.", as they
   did on 2026-11-09; the tests use copies the Internet Archive saved during the 88th Legislature.
+  - **The House calendar.** TLO's House Calendars page (`Calendars/CalendarsHouse.aspx`) explains the
+    calendar types and links "Calendars for upcoming dates" (`CalendarsByLegislature.aspx?Chbr=H`).
+    That list is the `upcomingcalendarshouse` feed: the feed's own `<link>` is that page. Sync reads the
+    feed, not the HTML; each event cites its own calendar document (`tlodocs/{session}/calendars/html/…`),
+    and the Events page links the House Calendars page while none is loaded.
+  - **"Nothing posted" is no event.** On 2026-11-10 all five feeds (`upcomingcalendarshouse`,
+    `upcomingcalendarssenate`, `upcomingmeetingshouse`, `upcomingmeetingssenate`,
+    `upcomingmeetingsjoint`) again held one item each, titled as above, with no `<link>` and the HTML
+    list page as its `<guid>`. `checkFeed` in `events_texas.ts` recognizes exactly that item and never
+    turns it into an event. A response that is not an RSS channel throws, so an error page is never read
+    as an empty feed.
+  - **Format not yet confirmed on the live site.** The parsers follow the populated 2023 copies. Every
+    item that is neither the "nothing posted" item nor in that format is counted and named in the run
+    notes and not loaded, and that feed is then not treated as the whole list (no "no longer listed"
+    notes). While `LIVE_POPULATED_FEED_SAVED` is null, the "nothing posted" note also says the live
+    format is unconfirmed. When the first populated feed appears (interim hearings, or the session's
+    calendars from January), save it as a fixture, run the tests on it, and set that constant to the
+    date.
+  - `upcomingmeetingssenate` is read by the live check only: no tracked official sits on a Texas Senate
+    committee (the lieutenant governor presides but is not a member).
 - **senate.gov** publishes the next meeting (`floor_schedule.htm`, "Convene at 3:00 p.m."), a tentative
   schedule of non-legislative periods per year (`2026_schedule.xml`; 2027's is not published yet), every
   scheduled committee hearing (`hearings.xml`), and each senator's committees by bioguide ID
@@ -195,16 +215,20 @@ Rules:
 - **Bills a Senate hearing names** are kept for every type senate.gov lists (S, HR, SJRES, HJRES, SRES,
   HRES, SCONRES, HCONRES; nominations are not bills). The event page links each to Congress.gov for
   the Congress in session on the hearing's date ("121st-congress"), and shows any other as text.
-- **"Not loaded yet."** Each source owns the `event_key` prefixes it writes (`law:`, `tlo_calendar:`,
-  `tlo_hearing:`, `senate_floor:`, `senate_schedule:`, `senate_hearing:`, `campaign:`). The Events page
-  and the Upcoming tab call a source loaded only when one of its own events is, so one source's events
-  never hide another that has none. A new event source adds its prefix to `lib/event-sources.ts`.
+- **"Not loaded yet."** Each source owns the `event_key`s it writes (`law:`, `tlo_calendar:{session}:H:`
+  for the House, `tlo_calendar:{session}:S:` for the Senate, `tlo_hearing:`, `senate_floor:`,
+  `senate_schedule:`, `senate_hearing:`, `campaign:`). The Events page and the Upcoming tab call a source
+  loaded only when one of its own events is, so one source's events never hide another that has none
+  (House calendars never make the Senate's look loaded). The Events page links each unloaded source
+  to the page that lists it when there is one (the House calendars to `Calendars/CalendarsHouse.aspx`).
+  A new event source adds its pattern and page to `lib/event-sources.ts`.
 - **Committee membership** is stored, never guessed: a hearing is matched only by committee code (and,
   for TLO, the same legislature, so a committee carries over into its called sessions). Until the
   representative's `tlo_member_code` for the 90th Legislature and the senator's `bioguide_id` are
   stored, the run notes say so and no hearings are loaded.
 - **Run notes.** Every run notes, per official, what each events page listed and how many of its
-  events were kept; when no floor calendars are posted yet; a missing ID or committee list; a law text
+  events were kept; what each TLO feed said when nothing is posted, and any feed item in a format the
+  parser does not read; when no floor calendars are posted yet; a missing ID or committee list; a law text
   that no longer reads as expected; and a tentative Senate schedule that is not published yet.
 
 ### Not automated yet
@@ -392,9 +416,12 @@ deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/
 deno run --allow-net --allow-env=DATA_GOV_KEY --node-modules-dir=none scripts/sync-live-check.ts
 ```
 
-The tests run on real pages saved from each source (`tests/fixtures`): 46 tests, of which G1 to G10
-cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. CI runs them on every pull request. Strip any keys a
+The tests run on real pages saved from each source (`tests/fixtures`): 50 tests, of which G1 to G10
+cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. G2 also covers
+every TLO feed as the live site served it between sessions (2026-11-09 and 2026-11-10), an item in an
+unknown format, and a Sync run on an empty House calendars feed. CI runs them on every pull request. Strip any keys a
 saved page embeds before committing it (a Mobilize page carries Mapbox, Google, Algolia and Facebook
 browser keys; GitHub push protection blocks them). The live check reads the real sources and prints statistics; it writes nothing. Its `events`
 section (`scripts/sync-live-check.ts events`) prints, for each event source, how many items it parsed
-against how many the page lists, and a sample.
+against how many the page lists, and a sample. For TLO's feeds it also prints the "nothing posted" item
+and how many items the parser could not read; a nonzero "not read" means the live format changed.

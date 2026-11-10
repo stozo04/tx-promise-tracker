@@ -4,18 +4,19 @@
  */
 
 /**
- * Where each kind of event comes from, by office. `prefixes` are the event_key prefixes the source's
- * Sync module writes (supabase/functions/tx_sync/events_*.ts), so a source counts as loaded only when
- * one of its own events is.
+ * Where each kind of event comes from, by office. `keys` matches the event_keys the source's Sync
+ * module writes (supabase/functions/tx_sync/events_*.ts), so a source counts as loaded only when one
+ * of its own events is. `href` is the page a person reads the same list on, when there is one page.
  */
-export const EVENT_SOURCES: { kind: string; offices: string[]; prefixes: string[]; source: string }[] = [
-  { kind: "session_day", offices: ["tx_house", "tx_lt_governor"], prefixes: ["law:"], source: "the convening and 140th days from Tex. Gov't Code §301.001 and Tex. Const. art. 3" },
-  { kind: "session_day", offices: ["us_senate"], prefixes: ["senate_floor:", "senate_schedule:"], source: "the U.S. Senate floor schedule and tentative schedule on senate.gov" },
-  { kind: "floor_vote", offices: ["tx_house", "tx_lt_governor"], prefixes: ["tlo_calendar:"], source: "Texas Legislature Online House and Senate calendars" },
-  { kind: "committee_hearing", offices: ["tx_house"], prefixes: ["tlo_hearing:"], source: "Texas Legislature Online committee meeting notices" },
-  { kind: "committee_hearing", offices: ["us_senate"], prefixes: ["senate_hearing:"], source: "senate.gov committee hearing schedules" },
-  { kind: "deadline", offices: ["tx_house", "tx_lt_governor", "governor", "us_senate"], prefixes: ["law:"], source: "dates the Texas Constitution, the Government Code and the U.S. Constitution set" },
-  { kind: "appearance", offices: ["tx_house", "tx_lt_governor", "governor", "us_senate"], prefixes: ["campaign:"], source: "each campaign's own events page" },
+export const EVENT_SOURCES: { kind: string; offices: string[]; keys: RegExp; source: string; href?: string }[] = [
+  { kind: "session_day", offices: ["tx_house", "tx_lt_governor"], keys: /^law:/, source: "the convening and 140th days from Tex. Gov't Code §301.001 and Tex. Const. art. 3", href: "https://statutes.capitol.texas.gov/Docs/GV/htm/GV.301.htm#301.001" },
+  { kind: "session_day", offices: ["us_senate"], keys: /^senate_(floor|schedule):/, source: "the U.S. Senate floor schedule and tentative schedule on senate.gov", href: "https://www.senate.gov/legislative/schedule/floor_schedule.htm" },
+  { kind: "floor_vote", offices: ["tx_house"], keys: /^tlo_calendar:[^:]+:H:/, source: "Texas Legislature Online House calendars", href: "https://capitol.texas.gov/Calendars/CalendarsHouse.aspx" },
+  { kind: "floor_vote", offices: ["tx_lt_governor"], keys: /^tlo_calendar:[^:]+:S:/, source: "Texas Legislature Online Senate calendars", href: "https://capitol.texas.gov/Calendars/CalendarsSenate.aspx" },
+  { kind: "committee_hearing", offices: ["tx_house"], keys: /^tlo_hearing:/, source: "Texas Legislature Online committee meeting notices", href: "https://capitol.texas.gov/Committees/MeetingsUpcoming.aspx?Chamber=H" },
+  { kind: "committee_hearing", offices: ["us_senate"], keys: /^senate_hearing:/, source: "senate.gov committee hearing schedules", href: "https://www.senate.gov/committees/hearings_meetings.htm" },
+  { kind: "deadline", offices: ["tx_house", "tx_lt_governor", "governor", "us_senate"], keys: /^law:/, source: "dates the Texas Constitution, the Government Code and the U.S. Constitution set" },
+  { kind: "appearance", offices: ["tx_house", "tx_lt_governor", "governor", "us_senate"], keys: /^campaign:/, source: "each campaign's own events page" },
 ];
 
 function sourcesShown(offices: string[], kind: string) {
@@ -27,14 +28,18 @@ export function sourcesFor(offices: string[], kind = "all") {
   return [...new Set(sourcesShown(offices, kind).map((s) => s.source))];
 }
 
+/** The page a source's list can be read on (the House calendars: TLO's House Calendars page), if it has one. */
+export function sourceHref(source: string) {
+  return EVENT_SOURCES.find((s) => s.source === source)?.href ?? null;
+}
+
 /**
  * The sources shown that have none of their own events among `events` (already narrowed to the
  * official and kind shown). A source is loaded only by an event of its kind whose event_key it wrote,
  * so Texas session days never make the Senate floor schedule look loaded.
  */
 export function unloadedSources(offices: string[], kind: string, events: { kind: string; key: string }[]) {
-  const loaded = (s: (typeof EVENT_SOURCES)[number]) =>
-    events.some((e) => e.kind === s.kind && s.prefixes.some((prefix) => e.key.startsWith(prefix)));
+  const loaded = (s: (typeof EVENT_SOURCES)[number]) => events.some((e) => e.kind === s.kind && s.keys.test(e.key));
   return [...new Set(sourcesShown(offices, kind).filter((s) => !loaded(s)).map((s) => s.source))];
 }
 

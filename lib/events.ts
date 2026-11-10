@@ -20,7 +20,7 @@ export function kindLabel(kind: string) {
 }
 
 // Which source fills which events lives in lib/event-sources.ts, which the Sync tests also load.
-export { EVENT_SOURCES, sourcesFor, unloadedSources } from "@/lib/event-sources";
+export { EVENT_SOURCES, sourceHref, sourcesFor, unloadedSources } from "@/lib/event-sources";
 
 /** The sources behind the calendar, by short name, for the one-line footer. */
 export const EVENT_SOURCE_NAMES = ["Texas Legislature Online", "senate.gov", "the Texas Constitution and statutes", "campaign events pages"];

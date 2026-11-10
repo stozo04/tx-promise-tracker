@@ -2,7 +2,7 @@
 // and files from the primary sources, saved on 2026-11-09. Run: deno test --allow-read (see README).
 import { assert, assertEquals, assertExists } from "jsr:@std/assert@1";
 
-import { congressBillUrl, congressOn, ordinal as ordinalSuffix, unloadedSources } from "../../../../lib/event-sources.ts";
+import { congressBillUrl, congressOn, ordinal as ordinalSuffix, sourceHref, unloadedSources } from "../../../../lib/event-sources.ts";
 import { cooldownRemaining, nextCentralMidnight, runErrors, runNotes, syncSummary } from "../../../../lib/sync.ts";
 import { allPages, congressBillRow, fecCycles, menuVotes, MAX_VOTES_PER_SYNC, nextPageUrl, senateSessions, senateVoteRow } from "../federal.ts";
 import { executiveOrdersIn, GOVERNOR_REPORTS, governorActionDate, monthsSince, ordersPrefix, parseArchivePosts } from "../governor.ts";
@@ -12,7 +12,7 @@ import { appearanceDraft, mobilizeEvents, mobilizeOrganization, squarespaceEvent
 import { clockTime, forOfficial, saveEvents, zonedTime } from "../events.ts";
 import { type LawKey, lawText, legalEvents, regularSession, secondTuesdayOfJanuary, verifiedLaws } from "../events_law.ts";
 import { floorDraft as senateFloorDraft, hearingDraft, parseFloorSchedule, parseSenateHearings, parseTentativeSchedule, senatorCommittees } from "../events_senate.ts";
-import { floorDraft, meetingDraft, memberCommittees, parseCalendarFeed, parseMeetingFeed } from "../events_texas.ts";
+import { calendarDoc, checkFeed, feedNotes, floorDraft, meetingDraft, meetingOf, memberCommittees, parseCalendarFeed, parseMeetingFeed, texasFloor } from "../events_texas.ts";
 import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature } from "../shared.ts";
 import { isStatement } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
@@ -470,6 +470,83 @@ Deno.test("G2: House and Senate floor calendars are read one event per chamber p
   assertEquals(parseCalendarFeed(await fixture("tlo_rss_calendars_house_2026-11-09.xml"), "H"), []);
 });
 
+Deno.test("G2: TLO's \"nothing posted\" item is no event, in every feed the live site served on 2026-11-09 and 2026-11-10", async () => {
+  const feeds = [
+    ["tlo_rss_calendars_house_2026-11-09.xml", "No calendars are available."],
+    ["tlo_rss_calendars_senate_2026-11-10.xml", "No calendars are available."],
+    ["tlo_rss_meetings_house_2026-11-09.xml", "No committee meetings scheduled."],
+    ["tlo_rss_meetings_senate_2026-11-10.xml", "No committee meetings scheduled."],
+    ["tlo_rss_meetings_joint_2026-11-10.xml", "No committee meetings scheduled."],
+  ];
+  for (const [file, title] of feeds) {
+    const xml = await fixture(file);
+    const reads = file.includes("calendars") ? (item: Parameters<typeof meetingOf>[0]) => calendarDoc(item, file.includes("senate") ? "S" : "H") !== null : (item: Parameters<typeof meetingOf>[0]) => meetingOf(item) !== null;
+    assertEquals(checkFeed(xml, reads), { listed: 1, nothingPosted: title, unrecognized: [] }, file);
+    assertEquals(file.includes("calendars") ? parseCalendarFeed(xml, file.includes("senate") ? "S" : "H") : parseMeetingFeed(xml), [], file);
+  }
+  // The run note names the feed, what it said, the TLO page, and that the live format is unconfirmed.
+  const check = checkFeed(await fixture("tlo_rss_calendars_house_2026-11-09.xml"), (item) => calendarDoc(item, "H") !== null);
+  const [note] = feedNotes("upcomingcalendarshouse", check, "House calendars");
+  assert(note.includes('the upcomingcalendarshouse feed says "No calendars are available."'));
+  assert(note.includes("https://capitol.texas.gov/Calendars/CalendarsHouse.aspx"));
+  assert(note.includes("current item format is unconfirmed"));
+});
+
+Deno.test("G2: every item of the populated 88th Legislature feeds is read, and an item in another format is reported, not loaded", async () => {
+  for (const [file, chamber] of [["tlo_rss_calendars_house_2023-05-19.xml", "H"], ["tlo_rss_calendars_senate_2023-05-19.xml", "S"]] as const) {
+    const check = checkFeed(await fixture(file), (item) => calendarDoc(item, chamber) !== null);
+    assertEquals([check.nothingPosted, check.unrecognized], [null, []], file);
+  }
+  for (const file of ["tlo_rss_meetings_house_2023-03-27.xml", "tlo_rss_meetings_senate_2023-05-19.xml"]) {
+    const check = checkFeed(await fixture(file), (item) => meetingOf(item) !== null);
+    assertEquals([check.nothingPosted, check.unrecognized], [null, []], file);
+  }
+  // One calendar moved to an address the parser does not know: it is counted and named, never guessed at.
+  const house = await fixture("tlo_rss_calendars_house_2023-05-19.xml");
+  const moved = house.replace("<link>https://capitol.texas.gov/tlodocs/88R/calendars/html/H120230518.htm</link>", "<link>https://capitol.texas.gov/Calendars/Calendar.aspx?id=1</link>");
+  const check = checkFeed(moved, (item) => calendarDoc(item, "H") !== null);
+  assertEquals(check.unrecognized.map((item) => item.title), ["Daily House Calendar - 5/18/2023"]);
+  const notes = feedNotes("upcomingcalendarshouse", check, "House calendars");
+  assertEquals(notes.length, 1);
+  assert(notes[0].includes(`1 of ${count(house, /<item>/g)} items are not in the format the parser reads`));
+  // An error page served with 200 is never read as an empty feed.
+  let threw = false;
+  try {
+    checkFeed("<html><body>Service unavailable</body></html>", () => true);
+  } catch {
+    threw = true;
+  }
+  assert(threw);
+});
+
+Deno.test("G2: Sync on the live House calendars feed between sessions writes no event and notes why", async () => {
+  const p = { id: "p1", slug: "zach-herbert", name: "Zach Herbert", office: "tx_house", term_start: "2027-01-12" };
+  const stored = forOfficial({ kind: "floor_vote", title: "Texas House floor calendar", starts_on: "2027-02-03", source_name: "TLO", source_url: "u", event_key: "tlo_calendar:90R:H:2027-02-03" }, p);
+  const run = async (feed: string) => {
+    const { db, written } = fakeEventsDb([{ ...stored, status: "scheduled" }]);
+    const log: Log = { counts: {}, errors: [], notes: [] };
+    const http = { text: () => Promise.resolve({ ok: true, status: 200, text: feed }) } as unknown as Http;
+    await texasFloor({ db, log, http, now: new Date("2026-11-10T18:00:00Z") } as unknown as Ctx, p as never);
+    return { written, log };
+  };
+  const empty = await run(await fixture("tlo_rss_calendars_house_2026-11-09.xml"));
+  assertEquals(empty.written, []);
+  assert(empty.log.notes.some((note) => note.includes("posts no upcoming House calendars") && note.includes("unconfirmed")));
+  // The feed lists nothing, so the stored 2027-02-03 calendar is noted as no longer listed, and left as is.
+  assert(empty.log.notes.some((note) => note.includes("no longer listed (Texas House floor calendar, 2027-02-03)")));
+  // A feed with an item in an unknown format is not the whole list: nothing is noted as no longer listed.
+  const odd = (await fixture("tlo_rss_calendars_house_2026-11-09.xml")).replace(
+    /<item>.*<\/item>/,
+    "<item><title>Daily House Calendar - 2/3/2027</title><link>https://capitol.texas.gov/Calendars/Calendar.aspx?id=1</link></item>",
+  );
+  const unknown = await run(odd);
+  assertEquals(unknown.written, []);
+  assert(unknown.log.notes.some((note) => note.includes("1 of 1 items are not in the format the parser reads")));
+  assertEquals(unknown.log.notes.some((note) => note.includes("no longer listed")), false);
+  // Nor is it described as TLO having posted no floor calendars (Bugbot, PR #13).
+  assertEquals(unknown.log.notes.some((note) => note.includes("floor calendars are posted")), false);
+});
+
 Deno.test("G3: the Senate floor schedule's next meeting is read, and Eastern time becomes Central", async () => {
   const next = parseFloorSchedule(await fixture("senate_floor_schedule_2026-11-09.htm"))!;
   assertEquals(next, { date: "2026-11-09", text: "Convene at 3:00 p.m.", time: "15:00", timeText: "3:00 p.m." });
@@ -667,6 +744,17 @@ Deno.test("G9: \"Not loaded yet\" names each source that has none of its own eve
     "dates the Texas Constitution, the Government Code and the U.S. Constitution set",
     "each campaign's own events page",
   ]);
+});
+
+Deno.test("G9: House calendars and Senate calendars load apart, and the House calendars cite TLO's House Calendars page", () => {
+  const offices = ["tx_house", "tx_lt_governor"];
+  const house = [{ kind: "floor_vote", key: "tlo_calendar:90R:H:2027-02-03" }];
+  assertEquals(unloadedSources(offices, "floor_vote", house), ["Texas Legislature Online Senate calendars"]);
+  assertEquals(unloadedSources(offices, "floor_vote", [{ kind: "floor_vote", key: "tlo_calendar:90R:S:2027-02-03" }]), ["Texas Legislature Online House calendars"]);
+  assertEquals(unloadedSources(["tx_house"], "floor_vote", []), ["Texas Legislature Online House calendars"]);
+  assertEquals(sourceHref("Texas Legislature Online House calendars"), "https://capitol.texas.gov/Calendars/CalendarsHouse.aspx");
+  assertEquals(sourceHref("Texas Legislature Online Senate calendars"), "https://capitol.texas.gov/Calendars/CalendarsSenate.aspx");
+  assertEquals(sourceHref("each campaign's own events page"), null);
 });
 
 Deno.test("G10: every bill type a Senate hearing names links to Congress.gov with the right ordinal (Bugbot, PR #9)", () => {

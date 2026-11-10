@@ -8,7 +8,7 @@
 import { mobilizeEvents, mobilizeOrganization, squarespaceEvents, squarespacePast } from "../supabase/functions/tx_sync/events_campaign.ts";
 import { LAWS, type LawKey, lawText, legalEvents, verifiedLaws } from "../supabase/functions/tx_sync/events_law.ts";
 import { parseFloorSchedule, parseSenateHearings, parseTentativeSchedule, SENATE_FLOOR_SCHEDULE, SENATE_HEARINGS, SENATE_MEMBERS, senateScheduleUrl, senatorCommittees } from "../supabase/functions/tx_sync/events_senate.ts";
-import { memberCommittees, parseCalendarFeed, parseMeetingFeed, TLO_RSS } from "../supabase/functions/tx_sync/events_texas.ts";
+import { calendarDoc, checkFeed, memberCommittees, meetingOf, parseCalendarFeed, parseMeetingFeed, TLO_RSS } from "../supabase/functions/tx_sync/events_texas.ts";
 import { allPages, menuVotes, senateVoteRow } from "../supabase/functions/tx_sync/federal.ts";
 import { executiveOrdersIn, GOVERNOR_REPORTS, governorActionDate, parseArchivePosts } from "../supabase/functions/tx_sync/governor.ts";
 import { JOURNAL_API, parseJournalDays, positionOf, recordVotesInDay } from "../supabase/functions/tx_sync/journal.ts";
@@ -161,18 +161,20 @@ if (wanted.has("events")) {
   // G: every event source. Counts are compared with what the page itself lists (its <item>s,
   // <meeting>s or events), and a sample of each is printed. Requests go one at a time.
   const items = (xml: string, re: RegExp) => [...xml.matchAll(re)].length;
-  const placeholder = (xml: string) => /No (committee meetings scheduled|calendars are available)/i.test(xml) ? 1 : 0;
+  // "listed" leaves out TLO's "nothing posted" item; "not read" is every other item the parser does not understand.
+  const feedLine = (check: ReturnType<typeof checkFeed>) =>
+    `${check.listed - (check.nothingPosted ? 1 : 0)} listed${check.nothingPosted ? ` ("${check.nothingPosted}")` : ""}, ${check.unrecognized.length} not read${check.unrecognized[0] ? ` (first: ${check.unrecognized[0].title} ${check.unrecognized[0].link ?? ""})` : ""}`;
   for (const type of ["upcomingmeetingshouse", "upcomingmeetingssenate", "upcomingmeetingsjoint"]) {
     const xml = (await http.text(`${TLO_RSS}${type}`)).text;
     const meetings = parseMeetingFeed(xml);
-    console.log(`G1 TLO ${type}: ${meetings.length} parsed / ${items(xml, /<item>/g) - placeholder(xml)} listed`, meetings[0] ?? "(none listed)");
+    console.log(`G1 TLO ${type}: ${meetings.length} parsed / ${feedLine(checkFeed(xml, (item) => meetingOf(item) !== null))}`, meetings[0] ?? "(none listed)");
   }
   const member = memberCommittees((await http.text("https://capitol.texas.gov/Members/MemberInfo.aspx?Leg=89&Chamber=H&Code=A3820")).text);
   console.log(`G1 TLO member page (89th, A3820): ${member.length} committees`, member.map((c) => `${c.code} ${c.name}`));
   for (const [type, chamber] of [["upcomingcalendarshouse", "H"], ["upcomingcalendarssenate", "S"]] as const) {
     const xml = (await http.text(`${TLO_RSS}${type}`)).text;
     const days = parseCalendarFeed(xml, chamber);
-    console.log(`G2 TLO ${type}: ${days.reduce((n, d) => n + d.documents.length, 0)} documents parsed / ${items(xml, /<item>/g) - placeholder(xml)} listed, ${days.length} floor days`, days[0] ?? "(none listed)");
+    console.log(`G2 TLO ${type}: ${days.reduce((n, d) => n + d.documents.length, 0)} documents parsed / ${feedLine(checkFeed(xml, (item) => calendarDoc(item, chamber) !== null))}, ${days.length} floor days`, days[0] ?? "(none listed)");
   }
   const floor = parseFloorSchedule((await http.text(SENATE_FLOOR_SCHEDULE)).text);
   console.log("G3 Senate floor schedule, next meeting:", floor);
