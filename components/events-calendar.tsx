@@ -3,7 +3,7 @@
 import { useCallback, useId, useMemo, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight, List } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, List } from "lucide-react";
 
 import { Dropdown } from "@/components/dropdown";
 import {
@@ -17,6 +17,7 @@ import {
   monthTitle,
   OFFICIAL_COLORS,
   shiftMonth,
+  sourceHref,
   timeLabel,
   unloadedSources,
 } from "@/lib/events";
@@ -230,10 +231,29 @@ export function EventsCalendar({
             {kind === "all" ? "" : ` under ${kindLabel(kind).toLowerCase()}`}.
           </p>
           {missing.length > 0 ? (
-            <p className="leading-7">
-              <span className="mr-2 inline-flex rounded-full bg-limestone px-2.5 py-1 text-xs font-semibold text-ink">Not loaded yet</span>
-              {capitalize(missing.join("; "))}. Sync checks these every day and adds events as the sources post them.
-            </p>
+            <div className="flex flex-col gap-1">
+              <p className="leading-7">
+                <span className="mr-2 inline-flex rounded-full bg-limestone px-2.5 py-1 text-xs font-semibold text-ink">Not loaded yet</span>
+                Sync checks these sources every day and adds events as they post them:
+              </p>
+              <ul className="flex flex-col pl-1">
+                {missing.map((source) => {
+                  const href = sourceHref(source);
+                  return (
+                    <li key={source} className="leading-7">
+                      {href ? (
+                        <a href={href} className="inline-flex min-h-11 items-center gap-1 font-semibold text-bluebonnet underline">
+                          {capitalize(source)}
+                          <ExternalLink className="size-4 shrink-0" aria-hidden="true" />
+                        </a>
+                      ) : (
+                        <span className="inline-flex min-h-11 items-center">{capitalize(source)}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           ) : null}
           <div className="flex flex-wrap gap-2">
             {prevEvent ? (
@@ -322,6 +342,8 @@ export function EventsCalendar({
   );
 }
 
+/** "The convening …" from "the convening …"; a domain name ("senate.gov committee …") keeps its case. */
 function capitalize(text: string) {
-  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+  if (!text || /^\S+\.\S/.test(text)) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
