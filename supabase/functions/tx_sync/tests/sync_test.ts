@@ -16,8 +16,8 @@ import { calendarDoc, checkFeed, feedNotes, floorDraft, meetingDraft, meetingOf,
 import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature } from "../shared.ts";
 import { isStatement } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
-import { coverRow, filesForReport, partBuilder, reportCycle, summarize, tecReportUrl, type TecReport } from "../tec.ts";
-import { csvReader } from "../tec_zip.ts";
+import { contribsFilter, coverRow, filesForReport, partBuilder, readContribs, reportCycle, summarize, tecReportUrl, type TecReport } from "../tec.ts";
+import { csvFields, csvReader, grepLines } from "../tec_zip.ts";
 import { authorDate, houseVoteRows, parseAuthorReport, parseReportRows, tloSessions } from "../texas.ts";
 
 const fixture = (name: string) => Deno.readTextFile(new URL(`./fixtures/${name}`, import.meta.url));
@@ -223,6 +223,65 @@ Deno.test("B1: contribution rows add up per report, with in-state totals and the
     assert(part.top_gifts.length <= 100);
     for (let i = 1; i < part.top_gifts.length; i++) assert(part.top_gifts[i - 1].amount >= part.top_gifts[i].amount);
   }
+});
+
+const textStream = (text: string, chunk = 997) => {
+  let at = 0;
+  return new ReadableStream<string>({
+    pull(controller) {
+      if (at >= text.length) return controller.close();
+      controller.enqueue(text.slice(at, at + chunk));
+      at += chunk;
+    },
+  });
+};
+
+const withField = (line: string, index: number, value: string) => {
+  const fields = csvFields(line);
+  fields[index] = value;
+  return fields.map((field) => (field.includes(",") ? `"${field.replaceAll('"', '""')}"` : field)).join(",");
+};
+
+Deno.test("B1: rows of other filers, other record types and replaced reports are dropped before they are parsed", async () => {
+  const text = await fixture("tec_contribs_sample.csv");
+  const [header, line] = text.trim().split("\n");
+  const columns = csvFields(header);
+  const keep = contribsFilter(header, ["00080440", "00081436"]);
+  assert(keep(line));
+  assert(!keep(withField(line, columns.indexOf("infoOnlyFlag"), "Y")));
+  assert(!keep(withField(line, columns.indexOf("filerIdent"), "00089964")));
+  assert(!keep(withField(line, columns.indexOf("recordType"), "PLDG")));
+  assertEquals(csvFields(line, 3), ["RCPT", "CORCOH", "A1"]);
+});
+
+Deno.test("B1: a contribs file read in batches, with the cursor carried as JSON, adds up to one full read", async () => {
+  const text = await fixture("tec_contribs_sample.csv");
+  const [header, ...lines] = text.trim().split("\n");
+  const columns = csvFields(header);
+  const mixed = [header, ...lines.flatMap((line, i) => (i % 3 === 0 ? [withField(line, columns.indexOf("infoOnlyFlag"), "Y"), line] : [line]))].join("\n") + "\n";
+  const filers = ["00080440"];
+  const whole = await readContribs(textStream(mixed), filers, null, Infinity);
+  assert(whole.finished);
+  assertEquals(whole.builder.rows("contribs_112.csv")[0].rows, lines.length);
+
+  let cursor: { done: number; parts: never[] } | null = null;
+  let calls = 0;
+  let batch;
+  do {
+    batch = await readContribs(textStream(mixed, 313), filers, cursor ? JSON.parse(JSON.stringify(cursor)) : null, 37);
+    cursor = { done: batch.done, parts: [...batch.builder.parts.values()] as never[] };
+    calls++;
+  } while (!batch.finished);
+  assertEquals(calls, Math.ceil(lines.length / 37));
+  const round = (rows: ReturnType<typeof whole.builder.rows>) => rows.map((row) => ({ ...row, top_gifts: row.top_gifts.map((g) => `${g.id}:${g.amount}`) }));
+  assertEquals(round(batch.builder.rows("contribs_112.csv")), round(whole.builder.rows("contribs_112.csv")));
+});
+
+Deno.test("B1: the line search stops when its handler says so", async () => {
+  const text = await fixture("tec_contribs_sample.csv");
+  let seen = 0;
+  await grepLines(textStream(text), [",00080440,"], () => ++seen === 5);
+  assertEquals(seen, 5);
 });
 
 Deno.test("B1: a report is looked for by the day it was received: the file that starts before it, and files that start that day", () => {

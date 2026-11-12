@@ -6,8 +6,9 @@
 // request claims the day and replies; its background task then calls this same function once per
 // stage (one source for one official, or one topic step), each with its own CPU budget, signed with
 // a key only this function can read (tx_private_settings.sync_stage_key). A stage that fails or
-// times out is written to the run's errors and the next stage still runs. The registry in
-// sources.ts decides which stages run and which sources the notes call "not automated".
+// times out is written to the run's errors and the next stage still runs. A stage call can hand a
+// carry (for example, where a long file's read stopped) to the calls after it in the same run.
+// The registry in sources.ts decides which stages run and which sources the notes call "not automated".
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { type Ctx, http, type Log, mergeLog, message, type Politician } from "./shared.ts";
@@ -55,10 +56,11 @@ async function setting(key: string) {
 }
 
 type Stage = { type: "source"; key: string; slug: string } | { type: "topic"; key: string };
-type StageRequest = { runId: string; runStartedAt: string; deadline: number; stage: Stage };
+type StageRequest = { runId: string; runStartedAt: string; deadline: number; stage: Stage; carry?: Record<string, unknown> };
+type StageReply = { log: Log; more: boolean; carry: Record<string, unknown> };
 
 /** Run one stage in this request. */
-async function runStage(req: StageRequest): Promise<{ log: Log; more: boolean }> {
+async function runStage(req: StageRequest): Promise<StageReply> {
   const log: Log = { counts: {}, errors: [], notes: [] };
   const ctx: Ctx = {
     db,
@@ -68,6 +70,7 @@ async function runStage(req: StageRequest): Promise<{ log: Log; more: boolean }>
     now: new Date(),
     runStartedAt: new Date(req.runStartedAt).toISOString(),
     deadline: Math.min(req.deadline, Date.now() + STAGE_BUDGET_MS),
+    carry: req.carry ?? {},
   };
   let more = false;
   try {
@@ -87,13 +90,14 @@ async function runStage(req: StageRequest): Promise<{ log: Log; more: boolean }>
     const name = req.stage.type === "source" ? `${req.stage.key}:${req.stage.slug}` : req.stage.key;
     log.errors.push({ source: name, message: message(err) });
   }
-  return { log, more };
+  return { log, more, carry: ctx.carry };
 }
 
 /** The background task: every stage in order, each in its own request, then close the run log. */
 async function runSync(runId: string, runStartedAt: string) {
   const log: Log = { counts: {}, errors: [], notes: [] };
   const deadline = Date.now() + RUN_BUDGET_MS;
+  let carry: Record<string, unknown> = {};
   try {
     const stageKey = await setting("sync_stage_key");
     if (!stageKey) throw new Error("tx_private_settings.sync_stage_key is missing; stages cannot be called.");
@@ -121,12 +125,13 @@ async function runSync(runId: string, runStartedAt: string) {
           const res = await fetch(SELF_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-tx-stage": stageKey },
-            body: JSON.stringify({ runId, runStartedAt, deadline, stage } satisfies StageRequest),
+            body: JSON.stringify({ runId, runStartedAt, deadline, stage, carry } satisfies StageRequest),
             signal: AbortSignal.timeout(STAGE_BUDGET_MS + 25_000),
           });
           if (!res.ok) throw new Error(`stage returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
-          const body = (await res.json()) as { log: Log; more: boolean };
+          const body = (await res.json()) as StageReply;
           mergeLog(log, body.log);
+          carry = body.carry ?? carry;
           if (!body.more) break;
         } catch (err) {
           log.errors.push({ source: name, message: message(err) });

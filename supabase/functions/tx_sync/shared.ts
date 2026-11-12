@@ -60,6 +60,7 @@ export type Ctx = {
   runStartedAt: string;
   /** Sources stop starting new requests after this time (ms since epoch), so the run ends in time. */
   deadline: number;
+  carry: Record<string, unknown>;
 };
 
 /** Add one stage's log to the run's log. Counts add up, nested counts (topic_matches) merge. */

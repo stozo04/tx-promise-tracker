@@ -121,9 +121,18 @@ never falls back to a name search.
   read again only when its CRC changes, and only files that hold the official's reports are read.
   Files run in the order reports arrived, so a report is looked for by the day it was received
   (report IDs are not in file order). The TEC's CDN refuses byte ranges (403) after a burst of
-  requests, so Sync reads the zip's directory once per run (kept in `tx_tec_files`), reads each
-  file with one request, and makes at most 15 requests per run, 4 seconds apart. The first
-  backfill therefore takes a few daily runs; after that a day needs only a handful of requests.
+  requests, so Sync reads the zip's directory once per run (kept in `tx_tec_files`) and makes at
+  most 15 requests per run, 4 seconds apart. The first backfill therefore takes a few daily runs;
+  after that a day needs only a handful of requests.
+- **TEC, long files.** A stage call has 2 seconds of CPU, and parsing every matching row of a busy
+  file takes more: `contribs_112.csv` (57 MB, the 8-day reports filed from 2026-10-26; Hinojosa's
+  alone is 229,722 rows) ran out of CPU in every stage on 2026-11-12. So rows of other filers, rows that are not
+  receipts (`recordType` other than `RCPT`) and rows of replaced reports are dropped by their first
+  seven fields before a row is parsed, and one call parses at most 50,000 kept rows. A file with
+  more goes on in the next call, which requests the file again, skips the rows already counted,
+  and adds to the totals carried from the call before. The file's parts are written, and its CRC
+  marked read, only when its last rows are in. Each of those extra requests counts toward the 15.
+  If the run ends partway through a file, the next run reads that file again from its first row.
 
 ### Events
 
@@ -338,6 +347,11 @@ official runs in its own request with its own CPU budget. The background task on
 requests. A stage that fails, times out, or hits the CPU limit is written to the run's errors as
 `{ source: "<key>:<slug>", message }`, and the next stage still runs.
 
+A stage call can hand a carry to the calls after it in the same run: its reply holds `carry`, and the
+background task sends it with every later stage request. TEC uses it to go on reading a long file
+where the last call stopped. A failed call leaves the carry as it was. The carry is never saved, so
+it lasts one run.
+
 Stage requests carry `x-tx-stage` with a key generated in the database
 (`tx_private_settings.sync_stage_key`), which only the function can read. A request without the
 right key is refused with 403. The public request never runs a stage itself.
@@ -366,7 +380,7 @@ In a `finally` block, so it runs even after errors:
 | --- | --- |
 | `finished_at` | When the run ended |
 | `triggered_by` | `button` or `schedule` |
-| `counts` | `fec_summaries`, `fec_contributions`, `congress_sponsored`, `congress_cosponsored`, `senate_votes`, `house_votes`, `house_journal_days`, `tlo_bills`, `governor_actions`, `executive_orders`, `senate_journal_votes`, `senate_journal_days`, `tec_reports`, `tec_files_read`, `tec_summaries`, `tec_contributions`, `topic_bills_checked`, `topic_pages_checked`, `topic_pages_changed`, `topic_posts_checked`, `topic_matches`, `events_added`, `events_changed` |
+| `counts` | `fec_summaries`, `fec_contributions`, `congress_sponsored`, `congress_cosponsored`, `senate_votes`, `house_votes`, `house_journal_days`, `tlo_bills`, `governor_actions`, `executive_orders`, `senate_journal_votes`, `senate_journal_days`, `tec_reports`, `tec_files_read`, `tec_batches_read`, `tec_summaries`, `tec_contributions`, `topic_bills_checked`, `topic_pages_checked`, `topic_pages_changed`, `topic_posts_checked`, `topic_matches`, `events_added`, `events_changed` |
 | `errors` | `{ source, message }` for each source that failed |
 | `notes` | One line per skipped source, missing ID, or backlog |
 
@@ -397,6 +411,7 @@ The Events page's footer shows the last Sync time.
 | Bill histories per governor batch | 80 | `MAX_HISTORIES_PER_CALL` |
 | Governor posts per batch | 80 | `MAX_POSTS_PER_CALL` |
 | Requests to the TEC | 15 per run, 4 seconds apart | `MAX_TEC_REQUESTS_PER_RUN`, `TEC_REQUEST_GAP_MS` |
+| TEC contribution rows parsed per call | 50,000 | `TEC_ROWS_PER_CALL` |
 | Campaign pages per batch | 100, 6 at a time | `PAGE_BATCH`, `PAGE_CONCURRENCY` |
 | URLs taken from one sitemap | 600 | `MAX_SITEMAP_URLS` |
 | Excerpts per page and topic | 10 | `MAX_FINDINGS_PER_PAGE_TOPIC` |
@@ -416,10 +431,12 @@ deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/
 deno run --allow-net --allow-env=DATA_GOV_KEY --node-modules-dir=none scripts/sync-live-check.ts
 ```
 
-The tests run on real pages saved from each source (`tests/fixtures`): 50 tests, of which G1 to G10
+The tests run on real pages saved from each source (`tests/fixtures`): 53 tests, of which G1 to G10
 cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. G2 also covers
 every TLO feed as the live site served it between sessions (2026-11-09 and 2026-11-10), an item in an
-unknown format, and a Sync run on an empty House calendars feed. CI runs them on every pull request. Strip any keys a
+unknown format, and a Sync run on an empty House calendars feed. B1 also checks that a TEC file
+read in batches, with the carry passed as JSON between calls, adds up to the same parts as one read,
+and that rows of other filers and of replaced reports are dropped before they are parsed. CI runs them on every pull request. Strip any keys a
 saved page embeds before committing it (a Mobilize page carries Mapbox, Google, Algolia and Facebook
 browser keys; GitHub push protection blocks them). The live check reads the real sources and prints statistics; it writes nothing. Its `events`
 section (`scripts/sync-live-check.ts events`) prints, for each event source, how many items it parsed
