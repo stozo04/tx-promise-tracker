@@ -146,7 +146,7 @@ export async function entryText(url: string, entry: ZipEntry, maxBytes = entry.c
 
 /**
  * Hand each line of a CSV that contains any of the needles (for example ",00080440,") to `onLine`,
- * and return the header row. Only the matching lines are split out, so a 200 MB file costs a fast
+ * in file order, and return the header row. Only the matching lines are split out, so a 200 MB file costs a fast
  * substring search, not a full parse. With `firstRowOnly`, it stops after the first data row, and it
  * stops early whenever `onLine` returns true.
  */
@@ -178,19 +178,22 @@ export async function grepLines(stream: ReadableStream<string>, needles: string[
         onLine((end === -1 ? body : body.slice(0, end)).replace(/\r$/, ""), header);
         break;
       }
-      const starts = new Set<number>();
+      const lines = new Map<number, number>();
       for (const needle of needles) {
         let from = 0;
-        while (!stop) {
+        while (true) {
           const hit = body.indexOf(needle, from);
           if (hit === -1) break;
           const start = body.lastIndexOf("\n", hit) + 1;
           const end = body.indexOf("\n", hit);
-          if (!starts.has(start)) {
-            starts.add(start);
-            stop = onLine(body.slice(start, end === -1 ? body.length : end).replace(/\r$/, ""), header) === true;
-          }
+          lines.set(start, end === -1 ? body.length : end);
           from = end === -1 ? body.length : end + 1;
+        }
+      }
+      for (const start of [...lines.keys()].sort((a, b) => a - b)) {
+        if (onLine(body.slice(start, lines.get(start)).replace(/\r$/, ""), header) === true) {
+          stop = true;
+          break;
         }
       }
     }

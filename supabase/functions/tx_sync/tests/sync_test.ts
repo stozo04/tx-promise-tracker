@@ -258,17 +258,24 @@ Deno.test("B1: a contribs file read in batches, with the cursor carried as JSON,
   const text = await fixture("tec_contribs_sample.csv");
   const [header, ...lines] = text.trim().split("\n");
   const columns = csvFields(header);
-  const mixed = [header, ...lines.flatMap((line, i) => (i % 3 === 0 ? [withField(line, columns.indexOf("infoOnlyFlag"), "Y"), line] : [line]))].join("\n") + "\n";
-  const filers = ["00080440"];
-  const whole = await readContribs(textStream(mixed), filers, null, Infinity);
+  const mixed = [
+    header,
+    ...lines.flatMap((line, i) => {
+      const filer = i % 2 === 0 ? line : withField(line, columns.indexOf("filerIdent"), "00081436");
+      return i % 3 === 0 ? [withField(filer, columns.indexOf("infoOnlyFlag"), "Y"), filer] : [filer];
+    }),
+  ].join("\n") + "\n";
+  const whole = await readContribs(textStream(mixed), ["00080440", "00081436"], null, Infinity);
   assert(whole.finished);
-  assertEquals(whole.builder.rows("contribs_112.csv")[0].rows, lines.length);
+  assertEquals(whole.builder.rows("contribs_112.csv").reduce((sum, row) => sum + row.rows, 0), lines.length);
 
+  const chunks = [313, 4096, 211, 1999, 97, 8191, 503];
   let cursor: { done: number; parts: never[] } | null = null;
   let calls = 0;
   let batch;
   do {
-    batch = await readContribs(textStream(mixed, 313), filers, cursor ? JSON.parse(JSON.stringify(cursor)) : null, 37);
+    const filers = calls % 2 === 0 ? ["00080440", "00081436"] : ["00081436", "00080440"];
+    batch = await readContribs(textStream(mixed, chunks[calls % chunks.length]), filers, cursor ? JSON.parse(JSON.stringify(cursor)) : null, 37);
     cursor = { done: batch.done, parts: [...batch.builder.parts.values()] as never[] };
     calls++;
   } while (!batch.finished);
@@ -282,6 +289,16 @@ Deno.test("B1: the line search stops when its handler says so", async () => {
   let seen = 0;
   await grepLines(textStream(text), [",00080440,"], () => ++seen === 5);
   assertEquals(seen, 5);
+});
+
+Deno.test("B1: matching lines come in file order, whatever the needles and chunks", async () => {
+  const lines = ["h,a", "1,x,", "2,y,", "3,x,", "4,y,", "5,x,"];
+  const text = lines.join("\n") + "\n";
+  for (const chunk of [1, 3, 7, 64]) {
+    const seen: string[] = [];
+    await grepLines(textStream(text, chunk), [",y,", ",x,"], (line) => void seen.push(line));
+    assertEquals(seen, lines.slice(1));
+  }
 });
 
 Deno.test("B1: a report is looked for by the day it was received: the file that starts before it, and files that start that day", () => {

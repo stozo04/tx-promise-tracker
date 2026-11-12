@@ -431,12 +431,12 @@ deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/
 deno run --allow-net --allow-env=DATA_GOV_KEY --node-modules-dir=none scripts/sync-live-check.ts
 ```
 
-The tests run on real pages saved from each source (`tests/fixtures`): 53 tests, of which G1 to G10
+The tests run on real pages saved from each source (`tests/fixtures`): 54 tests, of which G1 to G10
 cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. G2 also covers
 every TLO feed as the live site served it between sessions (2026-11-09 and 2026-11-10), an item in an
 unknown format, and a Sync run on an empty House calendars feed. B1 also checks that a TEC file
 read in batches, with the carry passed as JSON between calls, adds up to the same parts as one read,
-and that rows of other filers and of replaced reports are dropped before they are parsed. CI runs them on every pull request. Strip any keys a
+that matching lines come in file order whatever the chunking, and that rows of other filers and of replaced reports are dropped before they are parsed. CI runs them on every pull request. Strip any keys a
 saved page embeds before committing it (a Mobilize page carries Mapbox, Google, Algolia and Facebook
 browser keys; GitHub push protection blocks them). The live check reads the real sources and prints statistics; it writes nothing. Its `events`
 section (`scripts/sync-live-check.ts events`) prints, for each event source, how many items it parsed
