@@ -132,8 +132,9 @@ shown.
       Hinojosa, 45 to 141,908 rows each). A 10th is half read, as expected: its rows continue in a
       file not read yet.
     - Still open: the TEC's CDN refused byte ranges (403) after about 70 requests in the first run
-      and about 17 in a catch-up. Sync now keeps the zip directory, reads each file in one request,
-      and makes at most 15 requests per run. The remaining files (about 15) are read over the next
+      and about 17 in a catch-up. Sync now keeps the zip directory and makes at most 15 requests
+      per run. A file with more than 50,000 matching rows is read over several calls in the same run
+      (each call has 2 seconds of CPU; `contribs_112.csv` ran out of it on 2026-11-12, issue #15). The remaining files (about 15) are read over the next
       daily runs; the summaries are written when an official's files are all read. Check
       `tx_contribution_summaries` for the three state officials after those runs.
 

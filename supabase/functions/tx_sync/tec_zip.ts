@@ -146,15 +146,17 @@ export async function entryText(url: string, entry: ZipEntry, maxBytes = entry.c
 
 /**
  * Hand each line of a CSV that contains any of the needles (for example ",00080440,") to `onLine`,
- * and return the header row. Only the matching lines are split out, so a 200 MB file costs a fast
- * substring search, not a full parse. With `firstRowOnly`, it stops after the first data row.
+ * in file order, and return the header row. Only the matching lines are split out, so a 200 MB file costs a fast
+ * substring search, not a full parse. With `firstRowOnly`, it stops after the first data row, and it
+ * stops early whenever `onLine` returns true.
  */
-export async function grepLines(stream: ReadableStream<string>, needles: string[], onLine: (line: string, header: string) => void, firstRowOnly = false) {
+export async function grepLines(stream: ReadableStream<string>, needles: string[], onLine: (line: string, header: string) => boolean | void, firstRowOnly = false) {
   const reader = stream.getReader();
   let carry = "";
   let header: string | null = null;
+  let stop = false;
   try {
-    while (true) {
+    while (!stop) {
       const { value, done } = await reader.read();
       if (done) break;
       const text = carry + value;
@@ -176,7 +178,7 @@ export async function grepLines(stream: ReadableStream<string>, needles: string[
         onLine((end === -1 ? body : body.slice(0, end)).replace(/\r$/, ""), header);
         break;
       }
-      const starts = new Set<number>();
+      const lines = new Map<number, number>();
       for (const needle of needles) {
         let from = 0;
         while (true) {
@@ -184,11 +186,14 @@ export async function grepLines(stream: ReadableStream<string>, needles: string[
           if (hit === -1) break;
           const start = body.lastIndexOf("\n", hit) + 1;
           const end = body.indexOf("\n", hit);
-          if (!starts.has(start)) {
-            starts.add(start);
-            onLine(body.slice(start, end === -1 ? body.length : end).replace(/\r$/, ""), header);
-          }
+          lines.set(start, end === -1 ? body.length : end);
           from = end === -1 ? body.length : end + 1;
+        }
+      }
+      for (const start of [...lines.keys()].sort((a, b) => a - b)) {
+        if (onLine(body.slice(start, lines.get(start)).replace(/\r$/, ""), header) === true) {
+          stop = true;
+          break;
         }
       }
     }
@@ -198,8 +203,8 @@ export async function grepLines(stream: ReadableStream<string>, needles: string[
   return header ?? "";
 }
 
-/** Split one CSV line (quoted fields, doubled quotes). */
-export function csvFields(line: string) {
+/** Split one CSV line (quoted fields, doubled quotes), or only its first `limit` fields. */
+export function csvFields(line: string, limit = Infinity) {
   const out: string[] = [];
   let field = "";
   let quoted = false;
@@ -210,8 +215,11 @@ export function csvFields(line: string) {
       else if (c === '"') quoted = false;
       else field += c;
     } else if (c === '"') quoted = true;
-    else if (c === ",") out.push(field), (field = "");
-    else field += c;
+    else if (c === ",") {
+      out.push(field);
+      if (out.length >= limit) return out;
+      field = "";
+    } else field += c;
   }
   out.push(field);
   return out;

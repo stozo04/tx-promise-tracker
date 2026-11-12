@@ -16,8 +16,8 @@ import { calendarDoc, checkFeed, feedNotes, floorDraft, meetingDraft, meetingOf,
 import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature } from "../shared.ts";
 import { isStatement } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
-import { coverRow, filesForReport, partBuilder, reportCycle, summarize, tecReportUrl, type TecReport } from "../tec.ts";
-import { csvReader } from "../tec_zip.ts";
+import { contribsFilter, coverRow, filesForReport, partBuilder, readContribs, reportCycle, summarize, tecReportUrl, type TecReport } from "../tec.ts";
+import { csvFields, csvReader, grepLines } from "../tec_zip.ts";
 import { authorDate, houseVoteRows, parseAuthorReport, parseReportRows, tloSessions } from "../texas.ts";
 
 const fixture = (name: string) => Deno.readTextFile(new URL(`./fixtures/${name}`, import.meta.url));
@@ -222,6 +222,82 @@ Deno.test("B1: contribution rows add up per report, with in-state totals and the
   for (const part of parts) {
     assert(part.top_gifts.length <= 100);
     for (let i = 1; i < part.top_gifts.length; i++) assert(part.top_gifts[i - 1].amount >= part.top_gifts[i].amount);
+  }
+});
+
+const textStream = (text: string, chunk = 997) => {
+  let at = 0;
+  return new ReadableStream<string>({
+    pull(controller) {
+      if (at >= text.length) return controller.close();
+      controller.enqueue(text.slice(at, at + chunk));
+      at += chunk;
+    },
+  });
+};
+
+const withField = (line: string, index: number, value: string) => {
+  const fields = csvFields(line);
+  fields[index] = value;
+  return fields.map((field) => (field.includes(",") ? `"${field.replaceAll('"', '""')}"` : field)).join(",");
+};
+
+Deno.test("B1: rows of other filers, other record types and replaced reports are dropped before they are parsed", async () => {
+  const text = await fixture("tec_contribs_sample.csv");
+  const [header, line] = text.trim().split("\n");
+  const columns = csvFields(header);
+  const keep = contribsFilter(header, ["00080440", "00081436"]);
+  assert(keep(line));
+  assert(!keep(withField(line, columns.indexOf("infoOnlyFlag"), "Y")));
+  assert(!keep(withField(line, columns.indexOf("filerIdent"), "00089964")));
+  assert(!keep(withField(line, columns.indexOf("recordType"), "PLDG")));
+  assertEquals(csvFields(line, 3), ["RCPT", "CORCOH", "A1"]);
+});
+
+Deno.test("B1: a contribs file read in batches, with the cursor carried as JSON, adds up to one full read", async () => {
+  const text = await fixture("tec_contribs_sample.csv");
+  const [header, ...lines] = text.trim().split("\n");
+  const columns = csvFields(header);
+  const mixed = [
+    header,
+    ...lines.flatMap((line, i) => {
+      const filer = i % 2 === 0 ? line : withField(line, columns.indexOf("filerIdent"), "00081436");
+      return i % 3 === 0 ? [withField(filer, columns.indexOf("infoOnlyFlag"), "Y"), filer] : [filer];
+    }),
+  ].join("\n") + "\n";
+  const whole = await readContribs(textStream(mixed), ["00080440", "00081436"], null, Infinity);
+  assert(whole.finished);
+  assertEquals(whole.builder.rows("contribs_112.csv").reduce((sum, row) => sum + row.rows, 0), lines.length);
+
+  const chunks = [313, 4096, 211, 1999, 97, 8191, 503];
+  let cursor: { done: number; parts: never[] } | null = null;
+  let calls = 0;
+  let batch;
+  do {
+    const filers = calls % 2 === 0 ? ["00080440", "00081436"] : ["00081436", "00080440"];
+    batch = await readContribs(textStream(mixed, chunks[calls % chunks.length]), filers, cursor ? JSON.parse(JSON.stringify(cursor)) : null, 37);
+    cursor = { done: batch.done, parts: [...batch.builder.parts.values()] as never[] };
+    calls++;
+  } while (!batch.finished);
+  assertEquals(calls, Math.ceil(lines.length / 37));
+  const round = (rows: ReturnType<typeof whole.builder.rows>) => rows.map((row) => ({ ...row, top_gifts: row.top_gifts.map((g) => `${g.id}:${g.amount}`) }));
+  assertEquals(round(batch.builder.rows("contribs_112.csv")), round(whole.builder.rows("contribs_112.csv")));
+});
+
+Deno.test("B1: the line search stops when its handler says so", async () => {
+  const text = await fixture("tec_contribs_sample.csv");
+  let seen = 0;
+  await grepLines(textStream(text), [",00080440,"], () => ++seen === 5);
+  assertEquals(seen, 5);
+});
+
+Deno.test("B1: matching lines come in file order, whatever the needles and chunks", async () => {
+  const lines = ["h,a", "1,x,", "2,y,", "3,x,", "4,y,", "5,x,"];
+  const text = lines.join("\n") + "\n";
+  for (const chunk of [1, 3, 7, 64]) {
+    const seen: string[] = [];
+    await grepLines(textStream(text, chunk), [",y,", ",x,"], (line) => void seen.push(line));
+    assertEquals(seen, lines.slice(1));
   }
 });
 

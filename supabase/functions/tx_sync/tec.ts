@@ -7,14 +7,18 @@
 //      The first report ID of each file is noted (tx_tec_files) so only the files that hold an
 //      official's reports are read. Each read file leaves per-report totals, in-state totals,
 //      employers, and the largest gifts in tx_tec_report_parts. A file is read again only when
-//      its CRC changes. One file per call, because each call has 2 seconds of CPU.
+//      its CRC changes. Each call has 2 seconds of CPU, so a call reads at most one file and parses
+//      at most TEC_ROWS_PER_CALL of its rows; a longer file goes on in the next call from where the
+//      last one stopped, with the totals so far in the run's carry, and is saved once it is done.
+//      Rows of other filers, non-receipt rows, and rows of replaced reports are dropped before
+//      they are parsed.
 //   3. When every needed file is read, the reports of each cycle are added up into
 //      tx_contribution_summaries and the 100 largest individual gifts go into tx_contributions,
 //      each linked to the TEC report it came from, the same way the FEC data is shown.
 // Reports a later report replaced (infoOnlyFlag = Y) are left out.
 import { fecCycles } from "./federal.ts";
 import { bump, type Ctx, type Politician, upsert } from "./shared.ts";
-import { csvReader, entryText, grepLines, listZip, type ZipEntry } from "./tec_zip.ts";
+import { csvFields, csvReader, entryText, grepLines, listZip, type ZipEntry } from "./tec_zip.ts";
 
 const NOT_AN_EMPLOYER =
   /^(NOT[ -]?EMPLOYED|UNEMPLOYED|NONE|NULL|N\/?A|SELF[ -]?EMPLOYED|SELF|RETIRED|HOMEMAKER|STUDENT|INFORMATION REQUESTED.*|REQUESTED|BEST EFFORTS.*|-+)$/i;
@@ -86,8 +90,8 @@ export type Part = {
 };
 
 /** Adds contribution rows into per-report parts as they stream in, keeping only what is needed. */
-export function partBuilder() {
-  const parts = new Map<string, Part>();
+export function partBuilder(from: Part[] = []) {
+  const parts = new Map<string, Part>(from.map((part) => [`${part.filer_ident}:${part.report_id}`, part]));
   return {
     parts,
     add(row: Record<string, string>) {
@@ -139,6 +143,47 @@ export function partBuilder() {
       }));
     },
   };
+}
+
+export const TEC_ROWS_PER_CALL = 50_000;
+
+export function contribsFilter(header: string, filerIds: string[]) {
+  const columns = csvFields(header);
+  const type = columns.indexOf("recordType");
+  const info = columns.indexOf("infoOnlyFlag");
+  const filer = columns.indexOf("filerIdent");
+  if (Math.min(type, info, filer) < 0) throw new Error("TEC contribs header has no recordType, infoOnlyFlag or filerIdent column");
+  const wanted = new Set(filerIds);
+  const fields = Math.max(type, info, filer) + 1;
+  return (line: string) => {
+    const values = csvFields(line, fields);
+    return values[type] === "RCPT" && values[info] !== "Y" && wanted.has(values[filer]);
+  };
+}
+
+export type ContribsCursor = { file: string; crc: string; done: number; parts: Part[] };
+
+export async function readContribs(text: ReadableStream<string>, filerIds: string[], from: Pick<ContribsCursor, "done" | "parts"> | null, limit = TEC_ROWS_PER_CALL) {
+  const builder = partBuilder(from?.parts);
+  const skip = from?.done ?? 0;
+  let keep: ((line: string) => boolean) | null = null;
+  let read: ((line: string) => Record<string, string>) | null = null;
+  let seen = 0;
+  let finished = true;
+  await grepLines(text, filerIds.map((id) => `,${id},`), (line, header) => {
+    keep ??= contribsFilter(header, filerIds);
+    if (!keep(line)) return false;
+    const index = seen++;
+    if (index < skip) return false;
+    if (index >= skip + limit) {
+      finished = false;
+      return true;
+    }
+    read ??= csvReader(header);
+    builder.add(read(line));
+    return false;
+  });
+  return { builder, finished, done: skip + limit };
 }
 
 /** The TEC cycle a report belongs to: the even year at or after the end of its period. */
@@ -253,6 +298,8 @@ const TEC_REQUEST_GAP_MS = 4_000;
 
 const pause = () => new Promise((resolve) => setTimeout(resolve, TEC_REQUEST_GAP_MS));
 
+type TecCarry = { batchRequests: number; cursor: ContribsCursor | null };
+
 export async function tec(ctx: Ctx, p: Politician) {
   if (!p.tec_filer_id) {
     ctx.log.notes.push(`Texas Ethics Commission: no tec_filer_id is stored for ${p.name}. Add it from the TEC filer search.`);
@@ -261,8 +308,9 @@ export async function tec(ctx: Ctx, p: Politician) {
   const { data: filers } = await ctx.db.from("politicians").select("id, tec_filer_id").not("tec_filer_id", "is", null);
   const people = (filers ?? []) as { id: string; tec_filer_id: string }[];
   const needles = people.map((row) => `,${row.tec_filer_id},`);
+  const carry = (ctx.carry.tec ??= { batchRequests: 0, cursor: null }) as TecCarry;
   let state = await fileRows(ctx);
-  let used = [...state.values()].filter((row) => row.fetched_at && row.fetched_at >= ctx.runStartedAt).length;
+  let used = [...state.values()].filter((row) => row.fetched_at && row.fetched_at >= ctx.runStartedAt).length + carry.batchRequests;
   const budgetLeft = () => used < MAX_TEC_REQUESTS_PER_RUN;
   const spent = async (rows: Partial<FileRow>[]) => {
     used++;
@@ -350,21 +398,24 @@ export async function tec(ctx: Ctx, p: Politician) {
     }
   }
 
-  // 3. Read one file that is new or changed.
+  // 3. Read one file that is new or changed, or the next rows of the one an earlier call stopped in.
   const next = order.find((row) => needed.has(row.name) && row.read_crc !== row.crc);
   if (next) {
     if (!budgetLeft()) return waitNote(ctx, p);
+    const resume = carry.cursor?.file === next.name && carry.cursor.crc === next.crc ? carry.cursor : null;
     await pause();
-    const builder = partBuilder();
-    let read: ((line: string) => Record<string, string>) | null = null;
-    await grepLines(await entryText(zipUrl, entryOf(next)), needles, (line, header) => {
-      read ??= csvReader(header);
-      const row = read(line);
-      if (needles.includes(`,${row.filerIdent},`)) builder.add(row);
-    });
+    const batch = await readContribs(await entryText(zipUrl, entryOf(next)), people.map((row) => row.tec_filer_id), resume);
+    if (resume) carry.batchRequests++;
+    if (!batch.finished) {
+      carry.cursor = { file: next.name, crc: next.crc, done: batch.done, parts: [...batch.builder.parts.values()] };
+      if (!resume) await spent([{ name: next.name, crc: next.crc }]);
+      bump(ctx.log, "tec_batches_read");
+      return true;
+    }
+    if (resume) carry.cursor = null;
     const { error: deleteError } = await ctx.db.from("tx_tec_report_parts").delete().eq("file_name", next.name);
     if (deleteError) throw new Error(`tx_tec_report_parts: ${deleteError.message}`);
-    await upsert(ctx.db, "tx_tec_report_parts", builder.rows(next.name), "file_name,report_id,filer_ident");
+    await upsert(ctx.db, "tx_tec_report_parts", batch.builder.rows(next.name), "file_name,report_id,filer_ident");
     await spent([{ name: next.name, crc: next.crc, read_crc: next.crc }]);
     bump(ctx.log, "tec_files_read");
     return true;
