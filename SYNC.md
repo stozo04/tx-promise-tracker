@@ -368,7 +368,7 @@ with "Rate limit exceeded for trace" ([#17](https://github.com/stozo04/tx-promis
 So the background task sends at most 25 stage calls in any 60 seconds and waits for a free slot
 before the next one. If waiting would pass the run's budget, the stage gets the usual "time was up"
 note and continues next run. If Supabase still refuses a call with a rate-limit error, the task waits
-the `retryAfterMs` it gives (plus 250 ms) and sends the same call again, up to 3 times, before the
+the `retryAfterMs` it gives (plus 250 ms) and sends the same call again, up to 3 times in a row, before the
 stage is written to the errors. A retried call does not count as one of the stage's repeats.
 
 ### Order of stages
@@ -420,7 +420,7 @@ The Events page's footer shows the last Sync time.
 | One stage request | 120 seconds | `STAGE_BUDGET_MS` |
 | Repeats of a stage with a backlog | 20 per run | `MAX_REPEATS` |
 | Stage calls (Supabase allows 30 per trace per 60 s) | 25 in any 60 seconds | `STAGE_CALLS_PER_WINDOW`, `STAGE_CALL_WINDOW_MS` |
-| Retries of a stage call refused for the rate limit | 3, after `retryAfterMs` plus 250 ms | `MAX_RATE_LIMIT_RETRIES`, `RATE_LIMIT_PAD_MS` |
+| Retries of a stage call refused for the rate limit | 3 in a row, after `retryAfterMs` plus 250 ms | `MAX_RATE_LIMIT_RETRIES`, `RATE_LIMIT_PAD_MS` |
 | Senate roll calls per batch | 40 | `MAX_VOTES_PER_SYNC` |
 | House Journal days per batch | 25 | `MAX_JOURNAL_DAYS_PER_RUN` |
 | Senate Journal days per batch | 30 | `MAX_SENATE_DAYS_PER_CALL` |

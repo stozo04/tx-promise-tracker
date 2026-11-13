@@ -138,6 +138,7 @@ async function runSync(runId: string, runStartedAt: string) {
           if (!res.ok) throw new Error(`stage returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
           const body = (await res.json()) as StageReply;
           mergeLog(log, body.log);
+          rateLimited = 0;
           carry = body.carry ?? carry;
           if (!body.more) break;
         } catch (err) {
