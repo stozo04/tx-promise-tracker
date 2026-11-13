@@ -12,6 +12,7 @@ The code lives in:
 | Read-only status for agents (`GET /api/sync`) | [`app/api/sync/route.ts`](app/api/sync/route.ts) |
 | The Edge Function: claim, stages, and the run log | [`supabase/functions/tx_sync/index.ts`](supabase/functions/tx_sync/index.ts) |
 | The source registry (what runs per office, and what the notes call "not automated") | [`supabase/functions/tx_sync/sources.ts`](supabase/functions/tx_sync/sources.ts) |
+| Pacing stage calls under Supabase's nested-call budget | [`stage_pacing.ts`](supabase/functions/tx_sync/stage_pacing.ts) |
 | FEC, Congress.gov, Senate roll calls | [`federal.ts`](supabase/functions/tx_sync/federal.ts) |
 | House Journal record votes, TLO authored and co-authored bills | [`texas.ts`](supabase/functions/tx_sync/texas.ts), [`journal.ts`](supabase/functions/tx_sync/journal.ts) |
 | Governor's signings, vetoes, bills filed without signature, executive orders | [`governor.ts`](supabase/functions/tx_sync/governor.ts) |
@@ -356,6 +357,20 @@ Stage requests carry `x-tx-stage` with a key generated in the database
 (`tx_private_settings.sync_stage_key`), which only the function can read. A request without the
 right key is refused with 403. The public request never runs a stage itself.
 
+### Pacing stage calls
+
+Every stage call is the function calling itself, and Supabase allows one run's chain of such calls
+(its trace) [30 requests in any 60 seconds](https://supabase.com/docs/guides/functions/recursive-functions).
+Most stages return at once (officials who have not taken office, TEC batches with nothing new), so a
+run can send far more than 30 in its first minute. On 2026-11-12 that left every topic step failed
+with "Rate limit exceeded for trace" ([#17](https://github.com/stozo04/tx-promise-tracker/issues/17)).
+
+So the background task sends at most 25 stage calls in any 60 seconds and waits for a free slot
+before the next one. If waiting would pass the run's budget, the stage gets the usual "time was up"
+note and continues next run. If Supabase still refuses a call with a rate-limit error, the task waits
+the `retryAfterMs` it gives (plus 250 ms) and sends the same call again, up to 3 times in a row, before the
+stage is written to the errors. A retried call does not count as one of the stage's repeats.
+
 ### Order of stages
 
 1. For each official, each source the registry lists for their office (`sourcesFor(office)`), in
@@ -404,6 +419,8 @@ The Events page's footer shows the last Sync time.
 | Run budget | 370 seconds | `RUN_BUDGET_MS` |
 | One stage request | 120 seconds | `STAGE_BUDGET_MS` |
 | Repeats of a stage with a backlog | 20 per run | `MAX_REPEATS` |
+| Stage calls (Supabase allows 30 per trace per 60 s) | 25 in any 60 seconds | `STAGE_CALLS_PER_WINDOW`, `STAGE_CALL_WINDOW_MS` |
+| Retries of a stage call refused for the rate limit | 3 in a row, after `retryAfterMs` plus 250 ms | `MAX_RATE_LIMIT_RETRIES`, `RATE_LIMIT_PAD_MS` |
 | Senate roll calls per batch | 40 | `MAX_VOTES_PER_SYNC` |
 | House Journal days per batch | 25 | `MAX_JOURNAL_DAYS_PER_RUN` |
 | Senate Journal days per batch | 30 | `MAX_SENATE_DAYS_PER_CALL` |

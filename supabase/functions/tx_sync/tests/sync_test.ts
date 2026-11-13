@@ -16,6 +16,7 @@ import { calendarDoc, checkFeed, feedNotes, floorDraft, meetingDraft, meetingOf,
 import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature } from "../shared.ts";
 import { isStatement } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
+import { RATE_LIMIT_PAD_MS, rateLimitRetryMs, slotWaitMs, STAGE_CALL_WINDOW_MS, STAGE_CALLS_PER_WINDOW } from "../stage_pacing.ts";
 import { contribsFilter, coverRow, filesForReport, partBuilder, readContribs, reportCycle, summarize, tecReportUrl, type TecReport } from "../tec.ts";
 import { csvFields, csvReader, grepLines } from "../tec_zip.ts";
 import { authorDate, houseVoteRows, parseAuthorReport, parseReportRows, tloSessions } from "../texas.ts";
@@ -864,4 +865,25 @@ Deno.test("E2: every event source is in the registry for the offices it serves",
   assertEquals(keys("governor"), ["events_law", "events_campaign"]);
   assertEquals(keys("us_senate"), ["events_law", "events_senate_floor", "events_senate_hearings", "events_campaign"]);
   assertEquals(centralDate(new Date("2027-01-12T18:00:00Z")), "2027-01-12");
+});
+
+Deno.test("S1: stage calls stay under the nested-call budget in any 60 seconds", () => {
+  assertEquals(STAGE_CALLS_PER_WINDOW < 30, true);
+  const starts = Array.from({ length: STAGE_CALLS_PER_WINDOW - 1 }, (_, i) => i * 100);
+  assertEquals(slotWaitMs(starts, 3_000), 0);
+  const full = [...starts, 2_400];
+  assertEquals(slotWaitMs(full, 3_000), STAGE_CALL_WINDOW_MS - 3_000);
+  assertEquals(slotWaitMs(full, STAGE_CALL_WINDOW_MS), 0);
+  assertEquals(slotWaitMs([...full].reverse(), 3_000), STAGE_CALL_WINDOW_MS - 3_000);
+  const old = Array.from({ length: 40 }, (_, i) => i);
+  assertEquals(slotWaitMs(old, 120_000), 0);
+});
+
+Deno.test("S1: a refused nested call is retried after the time Supabase gives", () => {
+  const thrown = Object.assign(new Error("Rate limit exceeded for trace 01a1d36259e37c79a7f283e0e7b46851. Retry after 1762ms."), { retryAfterMs: 1762 });
+  assertEquals(rateLimitRetryMs(thrown), 1762 + RATE_LIMIT_PAD_MS);
+  assertEquals(rateLimitRetryMs(new Error("Rate limit exceeded for trace abc. Retry after 900ms.")), 900 + RATE_LIMIT_PAD_MS);
+  assertEquals(rateLimitRetryMs(new Error("Rate limit exceeded for trace abc.")), 1_000 + RATE_LIMIT_PAD_MS);
+  assertEquals(rateLimitRetryMs(new Error("stage returned 546: WORKER_RESOURCE_LIMIT")), null);
+  assertEquals(rateLimitRetryMs(new Error("The signal has been aborted")), null);
 });
