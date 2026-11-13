@@ -13,6 +13,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { type Ctx, http, type Log, mergeLog, message, type Politician } from "./shared.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "./sources.ts";
+import { MAX_RATE_LIMIT_RETRIES, rateLimitRetryMs, sleep, slotWaitMs } from "./stage_pacing.ts";
 import { TOPIC_STEPS } from "./topics.ts";
 
 const CORS = {
@@ -114,12 +115,18 @@ async function runSync(runId: string, runStartedAt: string) {
       ),
       ...TOPIC_STEPS.map((s): Stage => ({ type: "topic", key: s.key })),
     ];
+    const callStarts: number[] = [];
     for (const stage of stages) {
-      for (let attempt = 0; attempt < MAX_REPEATS; attempt++) {
-        if (Date.now() > deadline - 5_000) {
+      let rateLimited = 0;
+      for (let attempt = 0; attempt < MAX_REPEATS; ) {
+        const wait = slotWaitMs(callStarts, Date.now());
+        if (Date.now() + wait > deadline - 5_000) {
           log.notes.push(`Sync: the run's time was up before ${stage.type === "source" ? `${stage.key} for ${stage.slug}` : stage.key} finished; it continues next run.`);
           break;
         }
+        if (wait > 0) await sleep(wait);
+        callStarts.push(Date.now());
+        attempt++;
         const name = stage.type === "source" ? `${stage.key}:${stage.slug}` : stage.key;
         try {
           const res = await fetch(SELF_URL, {
@@ -134,6 +141,13 @@ async function runSync(runId: string, runStartedAt: string) {
           carry = body.carry ?? carry;
           if (!body.more) break;
         } catch (err) {
+          const retryMs = rateLimitRetryMs(err);
+          if (retryMs !== null && rateLimited < MAX_RATE_LIMIT_RETRIES) {
+            rateLimited++;
+            attempt--;
+            await sleep(retryMs);
+            continue;
+          }
           log.errors.push({ source: name, message: message(err) });
           break;
         }
