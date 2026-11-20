@@ -219,7 +219,8 @@ async function listPages(ctx: Ctx, officials: Official[]) {
           if (urls.length >= MAX_SITEMAP_URLS) break;
           urls.push(...(await sitemapUrls((url) => politeGet(ctx, gate, url, source), map)));
         }
-        if (urls.length === 0 && !site.refused) log.notes.push(`Topics: no sitemap found for ${p.name} at ${maps.join(", ")}.`);
+        const readable = maps.some((map) => robotsAllows(site.robots, map));
+        if (urls.length === 0 && !site.refused && readable) log.notes.push(`Topics: no sitemap found for ${p.name} at ${maps.join(", ")}.`);
         for (const url of [p.campaign_site_url, ...urls].slice(0, MAX_SITEMAP_URLS)) {
           rows.push({ url, politician_id: p.id, origin: "sitemap" });
         }
