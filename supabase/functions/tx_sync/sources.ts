@@ -1,6 +1,5 @@
 // The one list of every source Sync knows about, per office. The run reads it to decide what to
 // call, and the run notes read it to say what is not automated, so the two can never disagree.
-import { campaignAppearances } from "./events_campaign.ts";
 import { legalDates } from "./events_law.ts";
 import { senateFloor, senateHearings } from "./events_senate.ts";
 import { texasFloor, texasHearings } from "./events_texas.ts";
@@ -37,7 +36,6 @@ export const SOURCES: SourceDef[] = [
   { key: "events_tx_hearings", label: "Texas Legislature Online committee meetings", offices: ["tx_house"], run: texasHearings },
   { key: "events_senate_floor", label: "the U.S. Senate floor schedule and tentative schedule", offices: ["us_senate"], run: senateFloor },
   { key: "events_senate_hearings", label: "U.S. Senate committee hearings", offices: ["us_senate"], run: senateHearings },
-  { key: "events_campaign", label: "campaign events pages", offices: ["us_senate", "governor", "tx_lt_governor", "tx_house"], run: campaignAppearances },
 ];
 
 export function sourcesFor(office: string, sources = SOURCES) {

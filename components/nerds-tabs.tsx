@@ -465,9 +465,9 @@ export function NerdsTabs({
             <div className="flex flex-col gap-1.5">
               <p className="font-extrabold">This is what happens when you press Sync</p>
               <p className="leading-7 text-muted-foreground">
-                One Sync covers every official at once. It checks the sources below for anything new, reads each
-                official&apos;s campaign pages for every topic in the topic registry, and checks the bills each topic
-                watches on Texas Legislature Online and in the House Journal. New records are saved with a link back to
+                One Sync covers every official at once. It checks the sources below for anything new and checks the
+                bills each topic in the topic registry watches on Texas Legislature Online and in the House Journal.
+                Campaign sites were read until the election and are no longer checked; what was saved from them stays. New records are saved with a link back to
                 the original. Topic matches wait in a review queue: none becomes a promise until a person checks the
                 exact quote and the source. Only official records and the officials&apos; own words are used, never news
                 stories. Sync runs once a day for the whole site, and at 11:30 pm CT on its own if nobody pressed it that day.

@@ -23,7 +23,7 @@ export function kindLabel(kind: string) {
 export { EVENT_SOURCES, sourceHref, sourcesFor, unloadedSources } from "@/lib/event-sources";
 
 /** The sources behind the calendar, by short name, for the one-line footer. */
-export const EVENT_SOURCE_NAMES = ["Texas Legislature Online", "senate.gov", "the Texas Constitution and statutes", "campaign events pages"];
+export const EVENT_SOURCE_NAMES = ["Texas Legislature Online", "senate.gov", "the Texas Constitution and statutes"];
 
 /** One event as the calendar shows it: its rows for every official it concerns. */
 export type CalendarEvent = {

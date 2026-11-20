@@ -67,8 +67,6 @@ export type SyncSummary = {
     startedAt: string;
     finishedAt: string | null;
     /** Null when the run predates the topic sweep. */
-    pagesChecked: number | null;
-    pagesChanged: number | null;
     billsChecked: number | null;
     /** "button" or "schedule". */
     triggeredBy: string | null;
@@ -128,7 +126,7 @@ export function syncSummary(ledger: SummaryInput): SyncSummary {
     .filter((row) => row.source_type === "tx_sync")
     .sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
   const counts = run?.counts ?? {};
-  const pagesChecked = asNumber(counts.topic_pages_checked);
+  const billsChecked = asNumber(counts.topic_bills_checked);
   const matches = (counts.topic_matches ?? {}) as Record<string, Record<string, number>>;
   const active = ledger.topics.filter((topic) => topic.active);
   const awaiting = (politicianId: string | null, code: string) =>
@@ -140,7 +138,7 @@ export function syncSummary(ledger: SummaryInput): SyncSummary {
     topics: active.map((topic) => ({
       code: topic.code,
       label: topic.label,
-      matched: pagesChecked === null ? null : (matches[politician.slug]?.[topic.code] ?? 0),
+      matched: billsChecked === null ? null : (matches[politician.slug]?.[topic.code] ?? 0),
       awaiting: awaiting(politician.id, topic.code),
     })),
   }));
@@ -150,7 +148,7 @@ export function syncSummary(ledger: SummaryInput): SyncSummary {
     topics: active.map((topic) => ({
       code: topic.code,
       label: topic.label,
-      matched: pagesChecked === null ? null : (matches["watched-bills"]?.[topic.code] ?? 0),
+      matched: billsChecked === null ? null : (matches["watched-bills"]?.[topic.code] ?? 0),
       awaiting: awaiting(null, topic.code),
     })),
   });
@@ -160,9 +158,7 @@ export function syncSummary(ledger: SummaryInput): SyncSummary {
       ? {
           startedAt: run.started_at,
           finishedAt: run.finished_at,
-          pagesChecked,
-          pagesChanged: asNumber(counts.topic_pages_changed),
-          billsChecked: asNumber(counts.topic_bills_checked),
+          billsChecked,
           triggeredBy: run.triggered_by ?? null,
           errors: runErrors(run.errors),
           notes: runNotes(run.notes),

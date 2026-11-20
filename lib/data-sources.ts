@@ -153,16 +153,6 @@ export const DATA_SOURCES: DataSource[] = [
     state: "live",
     offices: ["governor", "tx_lt_governor", "tx_house"],
   },
-  {
-    name: "Campaign events pages",
-    who: "Each campaign's own events page, linked from its site",
-    what: "Public campaign events on or after the day the term starts, labeled as campaign events",
-    how: "The page's own event data (a Squarespace site, or Mobilize's public API for a campaign's Mobilize page), checked on each sync. Events other groups host are left out",
-    why: "It is the campaign's own listing of where the official will be",
-    href: "/events",
-    linkText: "See the Events calendar",
-    state: "live",
-  },
 ];
 
 export function dataSourcesFor(office: string) {

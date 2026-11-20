@@ -135,10 +135,11 @@ export default async function HowWeTrackPage() {
       <section className="space-y-3">
         <h2 className="text-2xl">One Sync for every official</h2>
         <p className="leading-7">
-          Sync covers every official and every topic in one run. For each topic it reads each official&apos;s
-          campaign pages for the topic&apos;s keywords, and it checks the bills the topic watches on Texas Legislature
-          Online and in the House Journal. A keyword match goes into a review queue. It becomes a promise only after a
-          person checks the exact quote and the source.
+          Sync covers every official and every topic in one run. For each topic it checks the bills the topic watches
+          on Texas Legislature Online and in the House Journal, so how each official votes can be set against what they
+          said. What they said during the campaign was saved from their campaign sites before the election, and those
+          sites are no longer read. A match goes into a review queue. It becomes a promise only after a person checks
+          the exact quote and the source.
         </p>
         {topics.length > 0 ? (
           <ul className="flex flex-col gap-2">

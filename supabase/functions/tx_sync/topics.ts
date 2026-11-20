@@ -1,22 +1,18 @@
 // The topic sweep and watched-bill check for tx_sync.
 //
 // For every active topic in tx_topics:
-//   1. Campaign pages. Each official's campaign sitemap (plus politicians.campaign_watch_urls) is
-//      listed into tx_watched_pages. Each run reads every page in batches of PAGE_BATCH, oldest-
-//      checked first, until all are read or the run's time is up. A page is matched again only when
-//      its visible text changed (SHA-256 of the text). Keyword matches go into tx_topic_findings
-//      with status 'new'. They are never published as promises: a person confirms the verbatim
-//      quote and the source first.
-//   2. X posts. Only when an X API bearer token is stored in tx_private_settings (x_bearer_token).
-//      Without one, the run notes say so. X is never scraped.
-//   3. Watched bills. For each bill in a topic's related_bills, the Texas Legislature Online
+//   1. Watched bills. For each bill in a topic's related_bills, the Texas Legislature Online
 //      history is read. House record votes are copied from the House Journal for every tracked
 //      official who served in that legislature (tx_legislative_service), labeled with the office
 //      they held then. Recent bill actions (filed, passed, signed, vetoed...) become findings.
-import { DISALLOW_ALL, isRefusal, MIN_SITE_GAP_MS, parseRobots, type Robots, robotsAllows, sameOriginSitemaps, SiteGate, siteGapMs } from "./crawl_policy.ts";
+//   2. X posts. Only when an X API bearer token is stored in tx_private_settings (x_bearer_token).
+//      Without one, the run notes say so. X is never scraped.
+//
+// Campaign sites are no longer read: the campaigns are over, and the pages and findings already
+// captured (tx_watched_pages, tx_topic_findings of kind 'page') stay as the record of what each
+// official stood for.
 import { houseJournalHtml, officeContext, parseRecordVote } from "./journal.ts";
 import { bump, type Ctx, cellText, type Db, decodeEntities, type Log, message, UA } from "./shared.ts";
-import { sleep } from "./stage_pacing.ts";
 
 type Topic = {
   code: string;
@@ -31,19 +27,9 @@ type Official = {
   slug: string;
   x_user_id: string | null;
   x_handle: string | null;
-  campaign_site_url: string | null;
-  campaign_watch_urls: string[] | null;
 };
 
-/**
- * Pages read in one batch. Each batch runs in its own request (its own CPU budget), and the run
- * keeps starting batches until every page has been read this run or the run's time is up.
- */
-export const PAGE_BATCH = 100;
-const PAGE_CONCURRENCY = 6;
-const MAX_SITEMAP_URLS = 600;
-const SKIP_UPDATE_CHUNK = 50;
-const MAX_FINDINGS_PER_PAGE_TOPIC = 10;
+const MAX_FINDINGS_PER_TEXT_TOPIC = 10;
 /** Bill actions older than this are history, not news, and are not queued as findings. */
 const BILL_ACTION_WINDOW_DAYS = 30;
 
@@ -65,20 +51,6 @@ async function fetchText(url: string, timeoutMs = 20_000) {
     redirect: "follow",
   });
   return { status: res.status, ok: res.ok, text: res.ok ? await res.text() : "" };
-}
-
-/** The text a visitor sees: no scripts, styles, or markup. Block elements become line breaks. */
-export function visibleText(html: string) {
-  return decodeEntities(
-    html
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<(script|style|noscript|svg|template|iframe)\b[\s\S]*?<\/\1>/gi, " ")
-      .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/section|\/article|\/blockquote)\b[^>]*>/gi, "\n")
-      .replace(/<[^>]+>/g, " "),
-  )
-    .replace(/[ \t ]+/g, " ")
-    .replace(/\s*\n\s*/g, "\n")
-    .trim();
 }
 
 function escapeRegex(value: string) {
@@ -113,14 +85,6 @@ function excerptAround(text: string, start: number, end: number) {
   return { from, to, excerpt: `${from > lineStart ? "…" : ""}${text.slice(from, to).trim()}${to < lineEnd ? "…" : ""}` };
 }
 
-/**
- * A passage worth a person's review: at least five words. Shorter matches are menu items, buttons,
- * and headings ("Cannabis & THC" in a site's navigation), not statements.
- */
-export function isStatement(excerpt: string) {
-  return excerpt.replace(/[…]/g, " ").trim().split(/\s+/).filter((word) => /[A-Za-z0-9]/.test(word)).length >= 5;
-}
-
 /** Every passage in the text that mentions one of the topic's keywords, one per distinct excerpt. */
 export function matchTopic(text: string, topic: Pick<Topic, "keywords">) {
   const found: { excerpt: string; keyword: string; at: number; from: number; to: number }[] = [];
@@ -136,259 +100,8 @@ export function matchTopic(text: string, topic: Pick<Topic, "keywords">) {
   }
   return found
     .sort((a, b) => a.at - b.at)
-    .slice(0, MAX_FINDINGS_PER_PAGE_TOPIC)
+    .slice(0, MAX_FINDINGS_PER_TEXT_TOPIC)
     .map(({ excerpt, keyword, at }) => ({ excerpt, keyword, at }));
-}
-
-type Fetched = { status: number; ok: boolean; text: string };
-type Site = { robots: Robots | null; refused?: number; skipped?: number; disallowed?: number };
-
-function sitesOf(ctx: Ctx) {
-  return (ctx.carry.sites ??= {}) as Record<string, Site>;
-}
-
-function refuse(ctx: Ctx, origin: string, status: number, url: string, source: string) {
-  const site = (sitesOf(ctx)[origin] ??= { robots: null });
-  if (site.refused) return;
-  site.refused = status;
-  ctx.log.errors.push({ source, message: `${status} from ${url}: ${new URL(origin).host} refused the Sync, so its other pages are skipped until the next run.` });
-}
-
-async function loadSite(ctx: Ctx, gate: SiteGate, origin: string, source: string): Promise<Site> {
-  const all = sitesOf(ctx);
-  if (all[origin]) return all[origin];
-  const site: Site = { robots: null };
-  all[origin] = site;
-  const url = `${origin}/robots.txt`;
-  await sleep(gate.reserve(origin, MIN_SITE_GAP_MS));
-  try {
-    const res = await fetchText(url);
-    if (res.ok) site.robots = parseRobots(res.text);
-    else if (isRefusal(res.status)) refuse(ctx, origin, res.status, url, source);
-    else if (res.status >= 500) {
-      site.robots = DISALLOW_ALL;
-      ctx.log.notes.push(`Topics: ${new URL(origin).host} answered ${res.status} for robots.txt, so its pages wait for the next run.`);
-    }
-  } catch (err) {
-    site.robots = DISALLOW_ALL;
-    ctx.log.notes.push(`Topics: robots.txt at ${origin} could not be read (${message(err)}), so its pages wait for the next run.`);
-  }
-  return site;
-}
-
-async function politeGet(ctx: Ctx, gate: SiteGate, url: string, source: string): Promise<Fetched | null> {
-  const origin = new URL(url).origin;
-  const site = await loadSite(ctx, gate, origin, source);
-  if (site.refused || !robotsAllows(site.robots, url)) return null;
-  await sleep(gate.reserve(origin, siteGapMs(site.robots)));
-  const res = await fetchText(url);
-  if (isRefusal(res.status)) refuse(ctx, origin, res.status, url, source);
-  return res;
-}
-
-async function sitemapUrls(get: (url: string) => Promise<Fetched | null>, url: string, depth = 0): Promise<string[]> {
-  const res = await get(url);
-  if (!res?.ok) return [];
-  const text = res.text;
-  const locs = [...text.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => decodeEntities(m[1]));
-  if (/<sitemapindex/i.test(text) && depth < 2) {
-    const pages: string[] = [];
-    for (const child of locs.filter((loc) => !/image|video/i.test(loc))) {
-      pages.push(...(await sitemapUrls(get, child, depth + 1)));
-      if (pages.length >= MAX_SITEMAP_URLS) break;
-    }
-    return pages;
-  }
-  return locs.filter((loc) => !/\.(jpe?g|png|gif|webp|svg|pdf|mp4|zip)(\?|$)/i.test(loc));
-}
-
-/** List every official's campaign pages in tx_watched_pages. New URLs are added; known ones keep their hash. */
-async function listPages(ctx: Ctx, officials: Official[]) {
-  const { db, log } = ctx;
-  const gate = new SiteGate();
-  for (const p of officials) {
-    const source = `topics_sitemap:${p.slug}`;
-    try {
-      const rows: { url: string; politician_id: string; origin: string }[] = [];
-      if (p.campaign_site_url) {
-        const origin = new URL(p.campaign_site_url).origin;
-        const site = await loadSite(ctx, gate, origin, source);
-        const maps = sameOriginSitemaps(site.robots, origin);
-        const urls: string[] = [];
-        for (const map of maps) {
-          if (urls.length >= MAX_SITEMAP_URLS) break;
-          urls.push(...(await sitemapUrls((url) => politeGet(ctx, gate, url, source), map)));
-        }
-        const readable = maps.some((map) => robotsAllows(site.robots, map));
-        if (urls.length === 0 && !site.refused && readable) log.notes.push(`Topics: no sitemap found for ${p.name} at ${maps.join(", ")}.`);
-        for (const url of [p.campaign_site_url, ...urls].slice(0, MAX_SITEMAP_URLS)) {
-          rows.push({ url, politician_id: p.id, origin: "sitemap" });
-        }
-      }
-      for (const url of p.campaign_watch_urls ?? []) rows.push({ url, politician_id: p.id, origin: "extra" });
-      const unique = [...new Map(rows.map((row) => [row.url, row])).values()];
-      if (unique.length === 0) continue;
-      const { error } = await db.from("tx_watched_pages").upsert(unique, { onConflict: "url", ignoreDuplicates: true });
-      if (error) throw new Error(`tx_watched_pages: ${error.message}`);
-    } catch (err) {
-      log.errors.push({ source, message: message(err) });
-    }
-  }
-}
-
-function siteNotes(ctx: Ctx) {
-  for (const [origin, site] of Object.entries(sitesOf(ctx))) {
-    const host = new URL(origin).host;
-    if (site.refused) {
-      ctx.log.notes.push(`Topics: ${host} refused the Sync (${site.refused}); ${site.skipped ?? 0} of its watched pages were skipped this run and are tried again next run.`);
-    }
-    if (site.disallowed) ctx.log.notes.push(`Topics: ${host}'s robots.txt does not allow ${site.disallowed} watched pages for this Sync; they were not read.`);
-  }
-}
-
-/**
- * Read one batch of campaign pages: the ones not yet read in this run, oldest-checked first.
- * Returns true when more pages are still waiting, so the run starts another batch.
- */
-async function readPages(ctx: Ctx, officials: Official[], topics: Topic[]) {
-  const { db, log } = ctx;
-  const bySlug = new Map(officials.map((p) => [p.id, p]));
-  const notThisRun = `last_checked_at.is.null,last_checked_at.lt.${ctx.runStartedAt}`;
-  const { data, error } = await db
-    .from("tx_watched_pages")
-    .select("url, politician_id, content_hash")
-    .or(notThisRun)
-    .order("last_checked_at", { ascending: true, nullsFirst: true })
-    .limit(PAGE_BATCH);
-  if (error) throw new Error(`tx_watched_pages: ${error.message}`);
-  const queue = [...((data ?? []) as { url: string; politician_id: string; content_hash: string | null }[])];
-  const gate = new SiteGate();
-  const sites = sitesOf(ctx);
-  for (const page of queue) {
-    const official = bySlug.get(page.politician_id);
-    if (official) await loadSite(ctx, gate, new URL(page.url).origin, `topics_page:${official.slug}`);
-  }
-  const skipped: string[] = [];
-  const skip = (url: string, site: Site, why: "skipped" | "disallowed") => {
-    skipped.push(url);
-    site[why] = (site[why] ?? 0) + 1;
-  };
-  const soonest = () => {
-    let best = 0;
-    let bestWait = Infinity;
-    for (let i = 0; i < queue.length; i++) {
-      const wait = gate.waitMs(new URL(queue[i].url).origin);
-      if (wait < bestWait) [best, bestWait] = [i, wait];
-      if (wait === 0) break;
-    }
-    return best;
-  };
-  // Passages already queued for an official and topic on any page, so text repeated across a site
-  // (a menu, a footer, a banner) is queued once, not once per page.
-  const known = new Set<string>();
-  for (let from = 0; ; from += 1000) {
-    const { data: rows, error: knownError } = await db.from("tx_topic_findings").select("politician_id, topic, content_hash").eq("kind", "page").range(from, from + 999);
-    if (knownError) throw new Error(`tx_topic_findings: ${knownError.message}`);
-    for (const row of (rows ?? []) as { politician_id: string; topic: string; content_hash: string }[]) known.add(`${row.politician_id}:${row.topic}:${row.content_hash}`);
-    if ((rows ?? []).length < 1000) break;
-  }
-  bump(log, "topic_pages_checked", 0);
-  bump(log, "topic_pages_changed", 0);
-  bump(log, "topic_pages_skipped", 0);
-
-  async function worker() {
-    while (queue.length > 0 && Date.now() < ctx.deadline) {
-      const page = queue.splice(soonest(), 1)[0];
-      const official = bySlug.get(page.politician_id);
-      if (!official) continue;
-      const origin = new URL(page.url).origin;
-      const site = sites[origin];
-      if (site.refused) {
-        skip(page.url, site, "skipped");
-        continue;
-      }
-      if (!robotsAllows(site.robots, page.url)) {
-        skip(page.url, site, "disallowed");
-        continue;
-      }
-      const wait = gate.reserve(origin, siteGapMs(site.robots));
-      if (Date.now() + wait >= ctx.deadline) break;
-      await sleep(wait);
-      if (site.refused) {
-        skip(page.url, site, "skipped");
-        continue;
-      }
-      const now = new Date().toISOString();
-      try {
-        const res = await fetchText(page.url);
-        if (!res.ok) {
-          await db.from("tx_watched_pages").update({ http_status: res.status, last_checked_at: now }).eq("url", page.url);
-          if (isRefusal(res.status)) refuse(ctx, origin, res.status, page.url, `topics_page:${official.slug}`);
-          else if (res.status !== 404 && res.status !== 410) {
-            log.errors.push({ source: `topics_page:${official.slug}`, message: `${res.status} from ${page.url}` });
-          }
-          continue;
-        }
-        const text = visibleText(res.text);
-        const hash = await sha256(text);
-        bump(log, "topic_pages_checked");
-        if (hash === page.content_hash) {
-          await db.from("tx_watched_pages").update({ http_status: res.status, last_checked_at: now }).eq("url", page.url);
-          continue;
-        }
-        bump(log, "topic_pages_changed");
-        const findings: Record<string, unknown>[] = [];
-        for (const topic of topics) {
-          let queued = 0;
-          for (const match of matchTopic(text, topic)) {
-            if (!isStatement(match.excerpt)) continue;
-            // Keyed on the excerpt, so a passage is queued once per official and topic.
-            const hash = await sha256(match.excerpt);
-            const key = `${official.id}:${topic.code}:${hash}`;
-            if (known.has(key)) continue;
-            known.add(key);
-            queued++;
-            findings.push({
-              politician_id: official.id,
-              topic: topic.code,
-              kind: "page",
-              url: page.url,
-              excerpt: match.excerpt,
-              keyword: match.keyword,
-              content_hash: hash,
-            });
-          }
-          bumpMatch(log, official.slug, topic.code, queued);
-        }
-        if (findings.length > 0) {
-          const { error: insertError } = await db
-            .from("tx_topic_findings")
-            .upsert(findings, { onConflict: "politician_id,topic,url,content_hash", ignoreDuplicates: true });
-          if (insertError) throw new Error(`tx_topic_findings: ${insertError.message}`);
-        }
-        await db
-          .from("tx_watched_pages")
-          .update({ http_status: res.status, content_hash: hash, last_checked_at: now, last_changed_at: now })
-          .eq("url", page.url);
-      } catch (err) {
-        await db.from("tx_watched_pages").update({ last_checked_at: now }).eq("url", page.url);
-        log.errors.push({ source: `topics_page:${official.slug}`, message: `${page.url}: ${message(err)}` });
-      }
-    }
-  }
-  await Promise.all(Array.from({ length: PAGE_CONCURRENCY }, worker));
-  const checkedAt = new Date().toISOString();
-  for (let from = 0; from < skipped.length; from += SKIP_UPDATE_CHUNK) {
-    const { error: skipError } = await db.from("tx_watched_pages").update({ last_checked_at: checkedAt }).in("url", skipped.slice(from, from + SKIP_UPDATE_CHUNK));
-    if (skipError) throw new Error(`tx_watched_pages: ${skipError.message}`);
-  }
-  bump(log, "topic_pages_skipped", skipped.length);
-  const { count } = await db.from("tx_watched_pages").select("url", { count: "exact", head: true }).or(notThisRun);
-  const waiting = count ?? 0;
-  const timeUp = Date.now() >= ctx.deadline;
-  if (waiting > 0 && timeUp) log.notes.push(`Topics: stopped at the time budget; ${waiting} pages wait for the next run.`);
-  if (waiting === 0 || timeUp) siteNotes(ctx);
-  return waiting > 0;
 }
 
 async function readPosts(db: Db, officials: Official[], topics: Topic[], log: Log) {
@@ -593,7 +306,7 @@ async function loadSweep(db: Db) {
   if (topicError) throw new Error(`tx_topics: ${topicError.message}`);
   const { data: people, error: peopleError } = await db
     .from("politicians")
-    .select("id, name, slug, x_user_id, x_handle, campaign_site_url, campaign_watch_urls");
+    .select("id, name, slug, x_user_id, x_handle");
   if (peopleError) throw new Error(`politicians: ${peopleError.message}`);
   return { topics: (topicRows ?? []) as Topic[], officials: (people ?? []) as Official[] };
 }
@@ -613,14 +326,6 @@ export const TOPIC_STEPS: { key: string; run: (ctx: Ctx) => Promise<boolean | vo
       }
       ctx.log.notes.push(`Topics: checked ${topics.map((t) => t.label).join(", ")} for ${officials.map((p) => p.name).join(", ")}.`);
       await checkBills(ctx.db, topics, ctx.log);
-    },
-  },
-  { key: "topics_sitemaps", run: async (ctx) => listPages(ctx, (await loadSweep(ctx.db)).officials) },
-  {
-    key: "topics_pages",
-    run: async (ctx) => {
-      const { topics, officials } = await loadSweep(ctx.db);
-      return topics.length > 0 && (await readPages(ctx, officials, topics));
     },
   },
   {
