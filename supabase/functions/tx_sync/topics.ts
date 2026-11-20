@@ -13,8 +13,10 @@
 //      history is read. House record votes are copied from the House Journal for every tracked
 //      official who served in that legislature (tx_legislative_service), labeled with the office
 //      they held then. Recent bill actions (filed, passed, signed, vetoed...) become findings.
+import { DISALLOW_ALL, isRefusal, MIN_SITE_GAP_MS, parseRobots, type Robots, robotsAllows, sameOriginSitemaps, SiteGate, siteGapMs } from "./crawl_policy.ts";
 import { houseJournalHtml, officeContext, parseRecordVote } from "./journal.ts";
 import { bump, type Ctx, cellText, type Db, decodeEntities, type Log, message, UA } from "./shared.ts";
+import { sleep } from "./stage_pacing.ts";
 
 type Topic = {
   code: string;
@@ -40,6 +42,7 @@ type Official = {
 export const PAGE_BATCH = 100;
 const PAGE_CONCURRENCY = 6;
 const MAX_SITEMAP_URLS = 600;
+const SKIP_UPDATE_CHUNK = 50;
 const MAX_FINDINGS_PER_PAGE_TOPIC = 10;
 /** Bill actions older than this are history, not news, and are not queued as findings. */
 const BILL_ACTION_WINDOW_DAYS = 30;
@@ -137,14 +140,61 @@ export function matchTopic(text: string, topic: Pick<Topic, "keywords">) {
     .map(({ excerpt, keyword, at }) => ({ excerpt, keyword, at }));
 }
 
-async function sitemapUrls(url: string, depth = 0): Promise<string[]> {
-  const { ok, text } = await fetchText(url);
-  if (!ok) return [];
+type Fetched = { status: number; ok: boolean; text: string };
+type Site = { robots: Robots | null; refused?: number; skipped?: number; disallowed?: number };
+
+function sitesOf(ctx: Ctx) {
+  return (ctx.carry.sites ??= {}) as Record<string, Site>;
+}
+
+function refuse(ctx: Ctx, origin: string, status: number, url: string, source: string) {
+  const site = (sitesOf(ctx)[origin] ??= { robots: null });
+  if (site.refused) return;
+  site.refused = status;
+  ctx.log.errors.push({ source, message: `${status} from ${url}: ${new URL(origin).host} refused the Sync, so its other pages are skipped until the next run.` });
+}
+
+async function loadSite(ctx: Ctx, gate: SiteGate, origin: string, source: string): Promise<Site> {
+  const all = sitesOf(ctx);
+  if (all[origin]) return all[origin];
+  const site: Site = { robots: null };
+  all[origin] = site;
+  const url = `${origin}/robots.txt`;
+  await sleep(gate.reserve(origin, MIN_SITE_GAP_MS));
+  try {
+    const res = await fetchText(url);
+    if (res.ok) site.robots = parseRobots(res.text);
+    else if (isRefusal(res.status)) refuse(ctx, origin, res.status, url, source);
+    else if (res.status >= 500) {
+      site.robots = DISALLOW_ALL;
+      ctx.log.notes.push(`Topics: ${new URL(origin).host} answered ${res.status} for robots.txt, so its pages wait for the next run.`);
+    }
+  } catch (err) {
+    site.robots = DISALLOW_ALL;
+    ctx.log.notes.push(`Topics: robots.txt at ${origin} could not be read (${message(err)}), so its pages wait for the next run.`);
+  }
+  return site;
+}
+
+async function politeGet(ctx: Ctx, gate: SiteGate, url: string, source: string): Promise<Fetched | null> {
+  const origin = new URL(url).origin;
+  const site = await loadSite(ctx, gate, origin, source);
+  if (site.refused || !robotsAllows(site.robots, url)) return null;
+  await sleep(gate.reserve(origin, siteGapMs(site.robots)));
+  const res = await fetchText(url);
+  if (isRefusal(res.status)) refuse(ctx, origin, res.status, url, source);
+  return res;
+}
+
+async function sitemapUrls(get: (url: string) => Promise<Fetched | null>, url: string, depth = 0): Promise<string[]> {
+  const res = await get(url);
+  if (!res?.ok) return [];
+  const text = res.text;
   const locs = [...text.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => decodeEntities(m[1]));
   if (/<sitemapindex/i.test(text) && depth < 2) {
     const pages: string[] = [];
     for (const child of locs.filter((loc) => !/image|video/i.test(loc))) {
-      pages.push(...(await sitemapUrls(child, depth + 1)));
+      pages.push(...(await sitemapUrls(get, child, depth + 1)));
       if (pages.length >= MAX_SITEMAP_URLS) break;
     }
     return pages;
@@ -153,14 +203,24 @@ async function sitemapUrls(url: string, depth = 0): Promise<string[]> {
 }
 
 /** List every official's campaign pages in tx_watched_pages. New URLs are added; known ones keep their hash. */
-async function listPages(db: Db, officials: Official[], log: Log) {
+async function listPages(ctx: Ctx, officials: Official[]) {
+  const { db, log } = ctx;
+  const gate = new SiteGate();
   for (const p of officials) {
+    const source = `topics_sitemap:${p.slug}`;
     try {
       const rows: { url: string; politician_id: string; origin: string }[] = [];
       if (p.campaign_site_url) {
         const origin = new URL(p.campaign_site_url).origin;
-        const urls = await sitemapUrls(`${origin}/sitemap.xml`);
-        if (urls.length === 0) log.notes.push(`Topics: no sitemap found for ${p.name} at ${origin}/sitemap.xml.`);
+        const site = await loadSite(ctx, gate, origin, source);
+        const maps = sameOriginSitemaps(site.robots, origin);
+        const urls: string[] = [];
+        for (const map of maps) {
+          if (urls.length >= MAX_SITEMAP_URLS) break;
+          urls.push(...(await sitemapUrls((url) => politeGet(ctx, gate, url, source), map)));
+        }
+        const readable = maps.some((map) => robotsAllows(site.robots, map));
+        if (urls.length === 0 && !site.refused && readable) log.notes.push(`Topics: no sitemap found for ${p.name} at ${maps.join(", ")}.`);
         for (const url of [p.campaign_site_url, ...urls].slice(0, MAX_SITEMAP_URLS)) {
           rows.push({ url, politician_id: p.id, origin: "sitemap" });
         }
@@ -171,8 +231,18 @@ async function listPages(db: Db, officials: Official[], log: Log) {
       const { error } = await db.from("tx_watched_pages").upsert(unique, { onConflict: "url", ignoreDuplicates: true });
       if (error) throw new Error(`tx_watched_pages: ${error.message}`);
     } catch (err) {
-      log.errors.push({ source: `topics_sitemap:${p.slug}`, message: message(err) });
+      log.errors.push({ source, message: message(err) });
     }
+  }
+}
+
+function siteNotes(ctx: Ctx) {
+  for (const [origin, site] of Object.entries(sitesOf(ctx))) {
+    const host = new URL(origin).host;
+    if (site.refused) {
+      ctx.log.notes.push(`Topics: ${host} refused the Sync (${site.refused}); ${site.skipped ?? 0} of its watched pages were skipped this run and are tried again next run.`);
+    }
+    if (site.disallowed) ctx.log.notes.push(`Topics: ${host}'s robots.txt does not allow ${site.disallowed} watched pages for this Sync; they were not read.`);
   }
 }
 
@@ -192,6 +262,27 @@ async function readPages(ctx: Ctx, officials: Official[], topics: Topic[]) {
     .limit(PAGE_BATCH);
   if (error) throw new Error(`tx_watched_pages: ${error.message}`);
   const queue = [...((data ?? []) as { url: string; politician_id: string; content_hash: string | null }[])];
+  const gate = new SiteGate();
+  const sites = sitesOf(ctx);
+  for (const page of queue) {
+    const official = bySlug.get(page.politician_id);
+    if (official) await loadSite(ctx, gate, new URL(page.url).origin, `topics_page:${official.slug}`);
+  }
+  const skipped: string[] = [];
+  const skip = (url: string, site: Site, why: "skipped" | "disallowed") => {
+    skipped.push(url);
+    site[why] = (site[why] ?? 0) + 1;
+  };
+  const soonest = () => {
+    let best = 0;
+    let bestWait = Infinity;
+    for (let i = 0; i < queue.length; i++) {
+      const wait = gate.waitMs(new URL(queue[i].url).origin);
+      if (wait < bestWait) [best, bestWait] = [i, wait];
+      if (wait === 0) break;
+    }
+    return best;
+  };
   // Passages already queued for an official and topic on any page, so text repeated across a site
   // (a menu, a footer, a banner) is queued once, not once per page.
   const known = new Set<string>();
@@ -203,18 +294,37 @@ async function readPages(ctx: Ctx, officials: Official[], topics: Topic[]) {
   }
   bump(log, "topic_pages_checked", 0);
   bump(log, "topic_pages_changed", 0);
+  bump(log, "topic_pages_skipped", 0);
 
   async function worker() {
     while (queue.length > 0 && Date.now() < ctx.deadline) {
-      const page = queue.shift()!;
+      const page = queue.splice(soonest(), 1)[0];
       const official = bySlug.get(page.politician_id);
       if (!official) continue;
+      const origin = new URL(page.url).origin;
+      const site = sites[origin];
+      if (site.refused) {
+        skip(page.url, site, "skipped");
+        continue;
+      }
+      if (!robotsAllows(site.robots, page.url)) {
+        skip(page.url, site, "disallowed");
+        continue;
+      }
+      const wait = gate.reserve(origin, siteGapMs(site.robots));
+      if (Date.now() + wait >= ctx.deadline) break;
+      await sleep(wait);
+      if (site.refused) {
+        skip(page.url, site, "skipped");
+        continue;
+      }
       const now = new Date().toISOString();
       try {
         const res = await fetchText(page.url);
         if (!res.ok) {
           await db.from("tx_watched_pages").update({ http_status: res.status, last_checked_at: now }).eq("url", page.url);
-          if (res.status !== 404 && res.status !== 410) {
+          if (isRefusal(res.status)) refuse(ctx, origin, res.status, page.url, `topics_page:${official.slug}`);
+          else if (res.status !== 404 && res.status !== 410) {
             log.errors.push({ source: `topics_page:${official.slug}`, message: `${res.status} from ${page.url}` });
           }
           continue;
@@ -267,9 +377,17 @@ async function readPages(ctx: Ctx, officials: Official[], topics: Topic[]) {
     }
   }
   await Promise.all(Array.from({ length: PAGE_CONCURRENCY }, worker));
+  const checkedAt = new Date().toISOString();
+  for (let from = 0; from < skipped.length; from += SKIP_UPDATE_CHUNK) {
+    const { error: skipError } = await db.from("tx_watched_pages").update({ last_checked_at: checkedAt }).in("url", skipped.slice(from, from + SKIP_UPDATE_CHUNK));
+    if (skipError) throw new Error(`tx_watched_pages: ${skipError.message}`);
+  }
+  bump(log, "topic_pages_skipped", skipped.length);
   const { count } = await db.from("tx_watched_pages").select("url", { count: "exact", head: true }).or(notThisRun);
   const waiting = count ?? 0;
-  if (waiting > 0 && Date.now() >= ctx.deadline) log.notes.push(`Topics: stopped at the time budget; ${waiting} pages wait for the next run.`);
+  const timeUp = Date.now() >= ctx.deadline;
+  if (waiting > 0 && timeUp) log.notes.push(`Topics: stopped at the time budget; ${waiting} pages wait for the next run.`);
+  if (waiting === 0 || timeUp) siteNotes(ctx);
   return waiting > 0;
 }
 
@@ -497,7 +615,7 @@ export const TOPIC_STEPS: { key: string; run: (ctx: Ctx) => Promise<boolean | vo
       await checkBills(ctx.db, topics, ctx.log);
     },
   },
-  { key: "topics_sitemaps", run: async (ctx) => listPages(ctx.db, (await loadSweep(ctx.db)).officials, ctx.log) },
+  { key: "topics_sitemaps", run: async (ctx) => listPages(ctx, (await loadSweep(ctx.db)).officials) },
   {
     key: "topics_pages",
     run: async (ctx) => {
