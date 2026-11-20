@@ -13,6 +13,7 @@ The code lives in:
 | The Edge Function: claim, stages, and the run log | [`supabase/functions/tx_sync/index.ts`](supabase/functions/tx_sync/index.ts) |
 | The source registry (what runs per office, and what the notes call "not automated") | [`supabase/functions/tx_sync/sources.ts`](supabase/functions/tx_sync/sources.ts) |
 | Pacing stage calls under Supabase's nested-call budget | [`stage_pacing.ts`](supabase/functions/tx_sync/stage_pacing.ts) |
+| Reading campaign sites politely: robots.txt, per-site pacing, refusals | [`crawl_policy.ts`](supabase/functions/tx_sync/crawl_policy.ts) |
 | FEC, Congress.gov, Senate roll calls | [`federal.ts`](supabase/functions/tx_sync/federal.ts) |
 | House Journal record votes, TLO authored and co-authored bills | [`texas.ts`](supabase/functions/tx_sync/texas.ts), [`journal.ts`](supabase/functions/tx_sync/journal.ts) |
 | Governor's signings, vetoes, bills filed without signature, executive orders | [`governor.ts`](supabase/functions/tx_sync/governor.ts) |
@@ -65,7 +66,7 @@ record it was copied from. Every lookup uses an ID stored for the official, neve
 | **Texas Senate Journal** (journal web service + `journals.senate.texas.gov`) | `journals-for-legislature/{leg}/S`, then every day page of the term; every roll call | `tx_lt_governor`, from `term_start` | "Mr. President" or "Madam President" in a Yeas or Nays list | `tx_record_actions` (`vote`, insert only) |
 | **Texas Ethics Commission** (`TEC_CF_CSV.zip`, by byte range) | `cover.csv` (report totals), then the `contribs_NN.csv` files that hold the official's reports | `governor`, `tx_lt_governor`, `tx_house` | `politicians.tec_filer_id` | `tx_tec_reports`, `tx_tec_report_parts`, then `tx_contribution_summaries`, `tx_contributions` |
 | **Texas Legislature Online** bill history | `History.aspx` for each bill in an active topic's `related_bills` | Every active topic | Bill number | `tx_topic_findings` (`bill_action`, last 30 days), and House votes as above |
-| **Campaign sites** | `{origin}/sitemap.xml` (two levels, up to 600 URLs) plus `politicians.campaign_watch_urls`, then every page in batches of 100 | Every official with a campaign site | URL | `tx_watched_pages`, `tx_topic_findings` (`page`) |
+| **Campaign sites** | `{origin}/robots.txt`, the same-site sitemaps it declares (else `{origin}/sitemap.xml`; two levels, up to 600 URLs) plus `politicians.campaign_watch_urls`, then every page robots.txt allows, in batches of 100 | Every official with a campaign site | URL | `tx_watched_pages`, `tx_topic_findings` (`page`) |
 | **X API** (`api.x.com/2`) | `users/{x_user_id}/tweets` (100 posts, no retweets) | Officials with `x_user_id` | `x_user_id` | `tx_topic_findings` (`post`) |
 | **Dates set by law** (`tcss.legis.texas.gov/resources`, the file server behind statutes.capitol.texas.gov; senate.gov's Constitution page) | `GV/htm/GV.301.htm`, `CN/htm/CN.3.htm`, `CN/htm/CN.4.htm`; the 20th Amendment | Every office, for the regular session that is upcoming | The office | `tx_upcoming_events` (`session_day`, `deadline`) |
 | **Texas Legislature Online** calendars (`MyTLO/RSS/RSS.aspx`), the lists behind TLO's House Calendars page (`Calendars/CalendarsHouse.aspx`) and Senate Calendars page | `Type=upcomingcalendarshouse` or `upcomingcalendarssenate` | `tx_house` (House), `tx_lt_governor` (Senate), from `term_start` | The chamber | `tx_upcoming_events` (`floor_vote`) |
@@ -115,6 +116,18 @@ never falls back to a name search.
 - **Campaign pages.** A match of fewer than five words (a menu item, a button, a heading) is not
   queued, and a passage is queued once per official and topic, not once for every page it appears
   on. Without this, reading every page queued a site's "Cannabis & THC" menu label 233 times.
+- **Campaign sites are read politely.** Each site's robots.txt is read once per run, and its rules
+  for `PromiseVsDelivered` (else for `*`) decide which pages are read, with the longest matching
+  rule winning and `Allow` winning a tie. A robots.txt that answers 5xx or cannot be reached counts
+  as "disallow everything" for that run (RFC 9309); a 404 allows everything. Requests to one site
+  start at least 500 ms apart, or the site's `Crawl-delay` if longer, while other sites are read in
+  parallel. When a site answers 401, 403, 429 or 451, Sync stops sending it requests for the rest of
+  the run, writes one error (the first refused URL), and adds one note with how many of its pages
+  were skipped. Skipped pages keep their last status and are tried again next run, so a lifted block
+  is noticed. Sync never changes its user agent or address to get past a refusal. Before this,
+  ginafortexas.com's firewall refused all 204 of its pages every night from 2026-11-15, logging 204
+  errors a run, and six parallel requests drew 429s from zach4texas.com
+  ([#21](https://github.com/stozo04/tx-promise-tracker/issues/21)).
 - **Senate Journal.** The lieutenant governor is not a senator, so the journal lists them in a
   roll call only when they vote (a tie, or the Committee of the Whole). That is rare: none from
   1999 to 2025. Every day of the term is still read once.
@@ -379,8 +392,10 @@ stage is written to the errors. A retried call does not count as one of the stag
    `events_campaign`).
 2. `topics_bills`: watched bills on Texas Legislature Online, with House record votes for every
    official who served in that legislature.
-3. `topics_sitemaps`: list campaign pages.
-4. `topics_pages`: read pages in batches of 100, repeated until every page has been read this run.
+3. `topics_sitemaps`: read each campaign site's robots.txt, then list its pages.
+4. `topics_pages`: read pages in batches of 100, repeated until every page has been read or skipped
+   this run. Each site's robots.txt result and any refusal travel in the run's carry (`sites`), so
+   later batches neither ask again nor contact a site that refused.
 5. `topics_x`: X posts, if a token is stored.
 
 A source with a backlog (journal days, roll calls, TEC files, pages) returns `more`, and the run
@@ -395,7 +410,7 @@ In a `finally` block, so it runs even after errors:
 | --- | --- |
 | `finished_at` | When the run ended |
 | `triggered_by` | `button` or `schedule` |
-| `counts` | `fec_summaries`, `fec_contributions`, `congress_sponsored`, `congress_cosponsored`, `senate_votes`, `house_votes`, `house_journal_days`, `tlo_bills`, `governor_actions`, `executive_orders`, `senate_journal_votes`, `senate_journal_days`, `tec_reports`, `tec_files_read`, `tec_batches_read`, `tec_summaries`, `tec_contributions`, `topic_bills_checked`, `topic_pages_checked`, `topic_pages_changed`, `topic_posts_checked`, `topic_matches`, `events_added`, `events_changed` |
+| `counts` | `fec_summaries`, `fec_contributions`, `congress_sponsored`, `congress_cosponsored`, `senate_votes`, `house_votes`, `house_journal_days`, `tlo_bills`, `governor_actions`, `executive_orders`, `senate_journal_votes`, `senate_journal_days`, `tec_reports`, `tec_files_read`, `tec_batches_read`, `tec_summaries`, `tec_contributions`, `topic_bills_checked`, `topic_pages_checked`, `topic_pages_changed`, `topic_pages_skipped`, `topic_posts_checked`, `topic_matches`, `events_added`, `events_changed` |
 | `errors` | `{ source, message }` for each source that failed |
 | `notes` | One line per skipped source, missing ID, or backlog |
 
@@ -429,7 +444,9 @@ The Events page's footer shows the last Sync time.
 | Governor posts per batch | 80 | `MAX_POSTS_PER_CALL` |
 | Requests to the TEC | 15 per run, 4 seconds apart | `MAX_TEC_REQUESTS_PER_RUN`, `TEC_REQUEST_GAP_MS` |
 | TEC contribution rows parsed per call | 50,000 | `TEC_ROWS_PER_CALL` |
-| Campaign pages per batch | 100, 6 at a time | `PAGE_BATCH`, `PAGE_CONCURRENCY` |
+| Campaign pages per batch | 100, 6 at a time across sites | `PAGE_BATCH`, `PAGE_CONCURRENCY` |
+| Requests to one campaign site | One start every 500 ms, or the site's `Crawl-delay` | `MIN_SITE_GAP_MS`, `siteGapMs` |
+| A campaign site that refuses (401, 403, 429, 451) | No more requests to it this run, one error | `REFUSAL_STATUSES` |
 | URLs taken from one sitemap | 600 | `MAX_SITEMAP_URLS` |
 | Excerpts per page and topic | 10 | `MAX_FINDINGS_PER_PAGE_TOPIC` |
 | Bill actions queued | Last 30 days | `BILL_ACTION_WINDOW_DAYS` |
@@ -448,8 +465,10 @@ deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/
 deno run --allow-net --allow-env=DATA_GOV_KEY --node-modules-dir=none scripts/sync-live-check.ts
 ```
 
-The tests run on real pages saved from each source (`tests/fixtures`): 54 tests, of which G1 to G10
-cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. G2 also covers
+The tests run on real pages saved from each source (`tests/fixtures`): 59 tests, of which G1 to G10
+cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. S2 covers
+robots.txt rules (the two campaign sites' real files, an agent-specific group, wildcards), sitemaps
+taken from robots.txt, per-site spacing, and which statuses count as a refusal. G2 also covers
 every TLO feed as the live site served it between sessions (2026-11-09 and 2026-11-10), an item in an
 unknown format, and a Sync run on an empty House calendars feed. B1 also checks that a TEC file
 read in batches, with the carry passed as JSON between calls, adds up to the same parts as one read,

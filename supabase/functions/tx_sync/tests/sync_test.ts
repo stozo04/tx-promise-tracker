@@ -16,6 +16,7 @@ import { calendarDoc, checkFeed, feedNotes, floorDraft, meetingDraft, meetingOf,
 import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature } from "../shared.ts";
 import { isStatement } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
+import { DISALLOW_ALL, isRefusal, MIN_SITE_GAP_MS, parseRobots, robotsAllows, sameOriginSitemaps, SiteGate, siteGapMs } from "../crawl_policy.ts";
 import { RATE_LIMIT_PAD_MS, rateLimitRetryMs, slotWaitMs, STAGE_CALL_WINDOW_MS, STAGE_CALLS_PER_WINDOW } from "../stage_pacing.ts";
 import { contribsFilter, coverRow, filesForReport, partBuilder, readContribs, reportCycle, summarize, tecReportUrl, type TecReport } from "../tec.ts";
 import { csvFields, csvReader, grepLines } from "../tec_zip.ts";
@@ -886,4 +887,46 @@ Deno.test("S1: a refused nested call is retried after the time Supabase gives", 
   assertEquals(rateLimitRetryMs(new Error("Rate limit exceeded for trace abc.")), 1_000 + RATE_LIMIT_PAD_MS);
   assertEquals(rateLimitRetryMs(new Error("stage returned 546: WORKER_RESOURCE_LIMIT")), null);
   assertEquals(rateLimitRetryMs(new Error("The signal has been aborted")), null);
+});
+
+Deno.test("S2: robots.txt rules for this agent decide which campaign pages are read", () => {
+  const yoast = parseRobots("# START YOAST BLOCK\nUser-agent: *\nDisallow:\n\nSitemap: https://ginafortexas.com/sitemap_index.xml\n# END YOAST BLOCK\n");
+  assertEquals(yoast, { allow: [], disallow: [], delayMs: 0, sitemaps: ["https://ginafortexas.com/sitemap_index.xml"] });
+  assert(robotsAllows(yoast, "https://ginafortexas.com/2026/03/any-post/"));
+
+  const wordpress = parseRobots("Sitemap: https://zach4texas.com/sitemap.xml\nSitemap: https://zach4texas.com/news-sitemap.xml\nUser-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php\n");
+  assert(robotsAllows(wordpress, "https://zach4texas.com/voting/"));
+  assert(!robotsAllows(wordpress, "https://zach4texas.com/wp-admin/options.php"));
+  assert(robotsAllows(wordpress, "https://zach4texas.com/wp-admin/admin-ajax.php"));
+
+  const own = parseRobots("User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nUser-agent: PromiseVsDelivered\nDisallow: /private\nCrawl-delay: 2\n");
+  assert(robotsAllows(own, "https://example.org/issues/"));
+  assert(!robotsAllows(own, "https://example.org/private/page"));
+  assertEquals(own.delayMs, 2_000);
+  assertEquals(siteGapMs(own), 2_000);
+  assertEquals(siteGapMs(null), MIN_SITE_GAP_MS);
+
+  const patterns = parseRobots("User-agent: *\nDisallow: /*.pdf$\nDisallow: /*?replytocom=\n");
+  assert(!robotsAllows(patterns, "https://example.org/files/plan.pdf"));
+  assert(robotsAllows(patterns, "https://example.org/files/plan.pdf.html"));
+  assert(!robotsAllows(patterns, "https://example.org/post/?replytocom=12"));
+  assert(!robotsAllows(DISALLOW_ALL, "https://example.org/"));
+  assert(robotsAllows(null, "https://example.org/"));
+});
+
+Deno.test("S2: sitemaps come from robots.txt on the same site, else /sitemap.xml", () => {
+  const robots = parseRobots("Sitemap: https://zach4texas.com/sitemap.xml\nSitemap: https://zach4texas.com/news-sitemap.xml\nSitemap: https://elsewhere.example/sitemap.xml\n");
+  assertEquals(sameOriginSitemaps(robots, "https://zach4texas.com"), ["https://zach4texas.com/sitemap.xml", "https://zach4texas.com/news-sitemap.xml"]);
+  assertEquals(sameOriginSitemaps(null, "https://www.vikkigoodwin.com"), ["https://www.vikkigoodwin.com/sitemap.xml"]);
+});
+
+Deno.test("S2: requests to one site are spaced apart, and a refusal stops the site for the run", () => {
+  const gate = new SiteGate();
+  assertEquals(gate.reserve("https://a.example", 500, 1_000), 0);
+  assertEquals(gate.reserve("https://a.example", 500, 1_000), 500);
+  assertEquals(gate.reserve("https://a.example", 500, 1_000), 1_000);
+  assertEquals(gate.reserve("https://b.example", 500, 1_000), 0);
+  assertEquals(gate.waitMs("https://a.example", 1_200), 1_300);
+  assertEquals([401, 403, 429, 451].every(isRefusal), true);
+  assertEquals([200, 404, 410, 500, 503].some(isRefusal), false);
 });
