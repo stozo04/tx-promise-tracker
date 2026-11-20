@@ -8,15 +8,13 @@ import { allPages, congressBillRow, fecCycles, menuVotes, MAX_VOTES_PER_SYNC, ne
 import { executiveOrdersIn, GOVERNOR_REPORTS, governorActionDate, monthsSince, ordersPrefix, parseArchivePosts } from "../governor.ts";
 import { officeContext, parseJournalDays, positionOf, recordVotesInDay } from "../journal.ts";
 import { parseSenateRollCalls, presidingVote } from "../senate_journal.ts";
-import { appearanceDraft, mobilizeEvents, mobilizeOrganization, squarespaceEvents, squarespacePast } from "../events_campaign.ts";
 import { clockTime, forOfficial, saveEvents, zonedTime } from "../events.ts";
 import { type LawKey, lawText, legalEvents, regularSession, secondTuesdayOfJanuary, verifiedLaws } from "../events_law.ts";
 import { floorDraft as senateFloorDraft, hearingDraft, parseFloorSchedule, parseSenateHearings, parseTentativeSchedule, senatorCommittees } from "../events_senate.ts";
 import { calendarDoc, checkFeed, feedNotes, floorDraft, meetingDraft, meetingOf, memberCommittees, parseCalendarFeed, parseMeetingFeed, texasFloor } from "../events_texas.ts";
 import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature } from "../shared.ts";
-import { isStatement } from "../topics.ts";
+import { TOPIC_STEPS } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
-import { DISALLOW_ALL, isRefusal, MIN_SITE_GAP_MS, parseRobots, robotsAllows, sameOriginSitemaps, SiteGate, siteGapMs } from "../crawl_policy.ts";
 import { RATE_LIMIT_PAD_MS, rateLimitRetryMs, slotWaitMs, STAGE_CALL_WINDOW_MS, STAGE_CALLS_PER_WINDOW } from "../stage_pacing.ts";
 import { contribsFilter, coverRow, filesForReport, partBuilder, readContribs, reportCycle, summarize, tecReportUrl, type TecReport } from "../tec.ts";
 import { csvFields, csvReader, grepLines } from "../tec_zip.ts";
@@ -426,7 +424,7 @@ Deno.test("E1: the summary carries every failed source and every note", () => {
         source_type: "tx_sync",
         started_at: "2026-11-09T20:00:00Z",
         finished_at: "2026-11-09T20:03:00Z",
-        counts: { topic_pages_checked: 3 },
+        counts: { topic_bills_checked: 3, topic_matches: { a: { t: 2 } } },
         errors: [{ source: "tec:gina-hinojosa", message: "403 from the TEC" }, "odd"],
         notes: "Started by the public Sync button\nTopics: X posts were not checked.\n\nHouse Journal: 4 days wait.",
         triggered_by: "schedule",
@@ -439,6 +437,8 @@ Deno.test("E1: the summary carries every failed source and every note", () => {
   ]);
   assertEquals(summary.lastRun?.notes, ["Topics: X posts were not checked.", "House Journal: 4 days wait."]);
   assertEquals(summary.lastRun?.triggeredBy, "schedule");
+  assertEquals(summary.lastRun?.billsChecked, 3);
+  assertEquals(summary.officials[0].topics[0].matched, 2);
   assertEquals(runErrors([]), []);
   assertEquals(runNotes(null), []);
 });
@@ -461,14 +461,6 @@ Deno.test("E2: a source without a run is named in the notes for exactly the offi
     "Gov: Source A and Source B are not automated yet. Their records are added by hand.",
     "Rep: Source B is not automated yet. Their records are added by hand.",
   ]);
-});
-
-// --- C2. Reading every page must not flood the review queue with a site's menu.
-
-Deno.test("C2: a menu label is not a statement; a sentence is", () => {
-  assertEquals(isStatement("Cannabis & THC"), false);
-  assertEquals(isStatement("Legalize it! Houston THC Rally"), true);
-  assertEquals(isStatement("As governor, Gina will fight to give the people of Texas a direct right to vote on the future of THC."), true);
 });
 
 // --- The staged run adds every stage's log into one.
@@ -698,30 +690,6 @@ Deno.test("G5: dates set by law are computed only from the law's own text", asyn
   assertEquals(legalEvents("tx_house", "2026-11-09", changed, "2027-01-12"), []);
 });
 
-Deno.test("G6: a Squarespace events page is read as its own JSON; only upcoming events, and times to the minute", async () => {
-  const json = JSON.parse(await fixture("campaign_vikkigoodwin_events.json"));
-  assertEquals(squarespaceEvents(json, "https://www.vikkigoodwin.com"), []); // Nothing upcoming after the election.
-  const past = squarespacePast(json, "https://www.vikkigoodwin.com");
-  assertEquals(past.length, json.past.length);
-  assertEquals(past[0].title, "Election Night Party - Austin");
-  assertEquals(past[0].startsAt, "2026-11-04T00:30:00.000Z"); // 6:30 PM Central on November 3, as the page says.
-  assertEquals(past[0].location, "Hyatt Regency, 208 Barton Springs Road, Austin, Texas, 78704");
-  const row = appearanceDraft(past[0], "vikkigoodwin.com", "campaign:vikkigoodwin.com");
-  assertEquals([row.starts_on, row.kind, row.is_campaign, row.source_url], ["2026-11-03", "appearance", true, "https://www.vikkigoodwin.com/events/nov3"]);
-});
-
-Deno.test("G6: a Mobilize page keeps only events the campaign itself hosts", async () => {
-  const org = mobilizeOrganization(await fixture("mobilize_ginahinojosafortexasgovernor.html"));
-  assertEquals(org, 46544);
-  const json = JSON.parse(await fixture("mobilize_api_46544.json"));
-  assertEquals(json.data.length, 4);
-  // All four upcoming events on the campaign's page are hosted by party organizations, not the campaign.
-  assertEquals(mobilizeEvents(json, org!), []);
-  // The same events, read for the organization that hosts them, are one row per time slot.
-  const party = mobilizeEvents(json, 370);
-  assertEquals(party.length, json.data.filter((e: { sponsor: { id: number } }) => e.sponsor.id === 370).reduce((n: number, e: { timeslots: unknown[] }) => n + e.timeslots.length, 0));
-});
-
 Deno.test("G7: time helpers convert wall-clock times across daylight time", () => {
   assertEquals(zonedTime("2027-01-12", "12:00", "America/Chicago"), "2027-01-12T18:00:00.000Z");
   assertEquals(zonedTime("2027-07-12", "12:00", "America/Chicago"), "2027-07-12T17:00:00.000Z");
@@ -820,7 +788,6 @@ Deno.test("G9: \"Not loaded yet\" names each source that has none of its own eve
   // For the governor alone, only the governor's sources are named.
   assertEquals(unloadedSources(["governor"], "all", []), [
     "dates the Texas Constitution, the Government Code and the U.S. Constitution set",
-    "each campaign's own events page",
   ]);
 });
 
@@ -832,7 +799,7 @@ Deno.test("G9: House calendars and Senate calendars load apart, and the House ca
   assertEquals(unloadedSources(["tx_house"], "floor_vote", []), ["Texas Legislature Online House calendars"]);
   assertEquals(sourceHref("Texas Legislature Online House calendars"), "https://capitol.texas.gov/Calendars/CalendarsHouse.aspx");
   assertEquals(sourceHref("Texas Legislature Online Senate calendars"), "https://capitol.texas.gov/Calendars/CalendarsSenate.aspx");
-  assertEquals(sourceHref("each campaign's own events page"), null);
+  assertEquals(sourceHref("dates the Texas Constitution, the Government Code and the U.S. Constitution set"), null);
 });
 
 Deno.test("G10: every bill type a Senate hearing names links to Congress.gov with the right ordinal (Bugbot, PR #9)", () => {
@@ -861,10 +828,10 @@ Deno.test("G10: every bill type a Senate hearing names links to Congress.gov wit
 
 Deno.test("E2: every event source is in the registry for the offices it serves", () => {
   const keys = (office: string) => sourcesFor(office).map((s) => s.key).filter((k) => k.startsWith("events_"));
-  assertEquals(keys("tx_house"), ["events_law", "events_tx_floor", "events_tx_hearings", "events_campaign"]);
-  assertEquals(keys("tx_lt_governor"), ["events_law", "events_tx_floor", "events_campaign"]);
-  assertEquals(keys("governor"), ["events_law", "events_campaign"]);
-  assertEquals(keys("us_senate"), ["events_law", "events_senate_floor", "events_senate_hearings", "events_campaign"]);
+  assertEquals(keys("tx_house"), ["events_law", "events_tx_floor", "events_tx_hearings"]);
+  assertEquals(keys("tx_lt_governor"), ["events_law", "events_tx_floor"]);
+  assertEquals(keys("governor"), ["events_law"]);
+  assertEquals(keys("us_senate"), ["events_law", "events_senate_floor", "events_senate_hearings"]);
   assertEquals(centralDate(new Date("2027-01-12T18:00:00Z")), "2027-01-12");
 });
 
@@ -889,44 +856,8 @@ Deno.test("S1: a refused nested call is retried after the time Supabase gives", 
   assertEquals(rateLimitRetryMs(new Error("The signal has been aborted")), null);
 });
 
-Deno.test("S2: robots.txt rules for this agent decide which campaign pages are read", () => {
-  const yoast = parseRobots("# START YOAST BLOCK\nUser-agent: *\nDisallow:\n\nSitemap: https://ginafortexas.com/sitemap_index.xml\n# END YOAST BLOCK\n");
-  assertEquals(yoast, { allow: [], disallow: [], delayMs: 0, sitemaps: ["https://ginafortexas.com/sitemap_index.xml"] });
-  assert(robotsAllows(yoast, "https://ginafortexas.com/2026/03/any-post/"));
-
-  const wordpress = parseRobots("Sitemap: https://zach4texas.com/sitemap.xml\nSitemap: https://zach4texas.com/news-sitemap.xml\nUser-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php\n");
-  assert(robotsAllows(wordpress, "https://zach4texas.com/voting/"));
-  assert(!robotsAllows(wordpress, "https://zach4texas.com/wp-admin/options.php"));
-  assert(robotsAllows(wordpress, "https://zach4texas.com/wp-admin/admin-ajax.php"));
-
-  const own = parseRobots("User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nUser-agent: PromiseVsDelivered\nDisallow: /private\nCrawl-delay: 2\n");
-  assert(robotsAllows(own, "https://example.org/issues/"));
-  assert(!robotsAllows(own, "https://example.org/private/page"));
-  assertEquals(own.delayMs, 2_000);
-  assertEquals(siteGapMs(own), 2_000);
-  assertEquals(siteGapMs(null), MIN_SITE_GAP_MS);
-
-  const patterns = parseRobots("User-agent: *\nDisallow: /*.pdf$\nDisallow: /*?replytocom=\n");
-  assert(!robotsAllows(patterns, "https://example.org/files/plan.pdf"));
-  assert(robotsAllows(patterns, "https://example.org/files/plan.pdf.html"));
-  assert(!robotsAllows(patterns, "https://example.org/post/?replytocom=12"));
-  assert(!robotsAllows(DISALLOW_ALL, "https://example.org/"));
-  assert(robotsAllows(null, "https://example.org/"));
-});
-
-Deno.test("S2: sitemaps come from robots.txt on the same site, else /sitemap.xml", () => {
-  const robots = parseRobots("Sitemap: https://zach4texas.com/sitemap.xml\nSitemap: https://zach4texas.com/news-sitemap.xml\nSitemap: https://elsewhere.example/sitemap.xml\n");
-  assertEquals(sameOriginSitemaps(robots, "https://zach4texas.com"), ["https://zach4texas.com/sitemap.xml", "https://zach4texas.com/news-sitemap.xml"]);
-  assertEquals(sameOriginSitemaps(null, "https://www.vikkigoodwin.com"), ["https://www.vikkigoodwin.com/sitemap.xml"]);
-});
-
-Deno.test("S2: requests to one site are spaced apart, and a refusal stops the site for the run", () => {
-  const gate = new SiteGate();
-  assertEquals(gate.reserve("https://a.example", 500, 1_000), 0);
-  assertEquals(gate.reserve("https://a.example", 500, 1_000), 500);
-  assertEquals(gate.reserve("https://a.example", 500, 1_000), 1_000);
-  assertEquals(gate.reserve("https://b.example", 500, 1_000), 0);
-  assertEquals(gate.waitMs("https://a.example", 1_200), 1_300);
-  assertEquals([401, 403, 429, 451].every(isRefusal), true);
-  assertEquals([200, 404, 410, 500, 503].some(isRefusal), false);
+Deno.test("S3: no stage reads a campaign site, its sitemap, its pages or its events page", () => {
+  assertEquals(TOPIC_STEPS.map((step) => step.key), ["topics_bills", "topics_x"]);
+  assertEquals(SOURCES.filter((source) => /campaign/i.test(`${source.key} ${source.label}`)), []);
+  assertEquals(unloadedSources(["us_senate", "governor", "tx_lt_governor", "tx_house"], "appearance", []), []);
 });

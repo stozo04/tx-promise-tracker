@@ -40,9 +40,9 @@ function LastRun({ summary }: { summary: SyncSummary }) {
           <p className="leading-6 text-muted-foreground">
             {lastRun.finishedAt ? "Finished" : "Started"} {SYNCED_AT.format(new Date(lastRun.finishedAt ?? lastRun.startedAt))} CT
             {lastRun.triggeredBy === "schedule" ? ", started by the nightly schedule" : ""}.{" "}
-            {lastRun.pagesChecked === null
-              ? "That run did not check campaign pages for topics."
-              : `${plural(lastRun.pagesChecked, "campaign page", "campaign pages")} checked, ${plural(lastRun.pagesChanged ?? 0, "page", "pages")} new or changed, ${plural(lastRun.billsChecked ?? 0, "watched bill", "watched bills")} checked.`}
+            {lastRun.billsChecked === null
+              ? "That run did not check topics."
+              : `${plural(lastRun.billsChecked, "watched bill", "watched bills")} checked.`}
             {lastRun.errors.length > 0 ? ` ${plural(lastRun.errors.length, "source", "sources")} failed and will be retried next time.` : " No source failed."}
           </p>
         ) : (
@@ -85,8 +85,9 @@ function LastRun({ summary }: { summary: SyncSummary }) {
           ))}
         </ul>
         <p className="leading-6 text-muted-foreground">
-          A finding is a keyword match on the official&apos;s own pages or a new action on a watched bill. It becomes a
-          promise only after a person checks the exact quote and the primary source.
+          A finding is a new action on a watched bill, a keyword match in the official&apos;s own posts, or a passage
+          saved from their campaign site before the election. It becomes a promise only after a person checks the
+          exact quote and the primary source.
         </p>
       </div>
     </details>

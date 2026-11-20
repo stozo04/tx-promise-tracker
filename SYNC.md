@@ -13,18 +13,16 @@ The code lives in:
 | The Edge Function: claim, stages, and the run log | [`supabase/functions/tx_sync/index.ts`](supabase/functions/tx_sync/index.ts) |
 | The source registry (what runs per office, and what the notes call "not automated") | [`supabase/functions/tx_sync/sources.ts`](supabase/functions/tx_sync/sources.ts) |
 | Pacing stage calls under Supabase's nested-call budget | [`stage_pacing.ts`](supabase/functions/tx_sync/stage_pacing.ts) |
-| Reading campaign sites politely: robots.txt, per-site pacing, refusals | [`crawl_policy.ts`](supabase/functions/tx_sync/crawl_policy.ts) |
 | FEC, Congress.gov, Senate roll calls | [`federal.ts`](supabase/functions/tx_sync/federal.ts) |
 | House Journal record votes, TLO authored and co-authored bills | [`texas.ts`](supabase/functions/tx_sync/texas.ts), [`journal.ts`](supabase/functions/tx_sync/journal.ts) |
 | Governor's signings, vetoes, bills filed without signature, executive orders | [`governor.ts`](supabase/functions/tx_sync/governor.ts) |
 | Texas Senate Journal (votes by the presiding officer) | [`senate_journal.ts`](supabase/functions/tx_sync/senate_journal.ts) |
 | Texas Ethics Commission campaign finance | [`tec.ts`](supabase/functions/tx_sync/tec.ts), [`tec_zip.ts`](supabase/functions/tx_sync/tec_zip.ts) |
-| The topic sweep: watched bills, campaign pages, X posts | [`topics.ts`](supabase/functions/tx_sync/topics.ts) |
+| The topic sweep: watched bills, X posts | [`topics.ts`](supabase/functions/tx_sync/topics.ts) |
 | Events: the refresh rule and Central time | [`events.ts`](supabase/functions/tx_sync/events.ts) |
 | Events: dates set by law | [`events_law.ts`](supabase/functions/tx_sync/events_law.ts) |
 | Events: Texas floor calendars and committee meetings | [`events_texas.ts`](supabase/functions/tx_sync/events_texas.ts) |
 | Events: U.S. Senate floor schedule and committee hearings | [`events_senate.ts`](supabase/functions/tx_sync/events_senate.ts) |
-| Events: campaign events pages | [`events_campaign.ts`](supabase/functions/tx_sync/events_campaign.ts) |
 | The Events page, the event page, and the nerds page's Upcoming tab | [`app/events`](app/events), [`components/events-calendar.tsx`](components/events-calendar.tsx), [`lib/events.ts`](lib/events.ts) |
 | Which source fills which events (by `event_key` prefix), and Congress.gov links for hearing bills | [`lib/event-sources.ts`](lib/event-sources.ts) |
 | Unit tests on saved primary-source pages | [`tests/sync_test.ts`](supabase/functions/tx_sync/tests/sync_test.ts) |
@@ -66,17 +64,26 @@ record it was copied from. Every lookup uses an ID stored for the official, neve
 | **Texas Senate Journal** (journal web service + `journals.senate.texas.gov`) | `journals-for-legislature/{leg}/S`, then every day page of the term; every roll call | `tx_lt_governor`, from `term_start` | "Mr. President" or "Madam President" in a Yeas or Nays list | `tx_record_actions` (`vote`, insert only) |
 | **Texas Ethics Commission** (`TEC_CF_CSV.zip`, by byte range) | `cover.csv` (report totals), then the `contribs_NN.csv` files that hold the official's reports | `governor`, `tx_lt_governor`, `tx_house` | `politicians.tec_filer_id` | `tx_tec_reports`, `tx_tec_report_parts`, then `tx_contribution_summaries`, `tx_contributions` |
 | **Texas Legislature Online** bill history | `History.aspx` for each bill in an active topic's `related_bills` | Every active topic | Bill number | `tx_topic_findings` (`bill_action`, last 30 days), and House votes as above |
-| **Campaign sites** | `{origin}/robots.txt`, the same-site sitemaps it declares (else `{origin}/sitemap.xml`; two levels, up to 600 URLs) plus `politicians.campaign_watch_urls`, then every page robots.txt allows, in batches of 100 | Every official with a campaign site | URL | `tx_watched_pages`, `tx_topic_findings` (`page`) |
 | **X API** (`api.x.com/2`) | `users/{x_user_id}/tweets` (100 posts, no retweets) | Officials with `x_user_id` | `x_user_id` | `tx_topic_findings` (`post`) |
 | **Dates set by law** (`tcss.legis.texas.gov/resources`, the file server behind statutes.capitol.texas.gov; senate.gov's Constitution page) | `GV/htm/GV.301.htm`, `CN/htm/CN.3.htm`, `CN/htm/CN.4.htm`; the 20th Amendment | Every office, for the regular session that is upcoming | The office | `tx_upcoming_events` (`session_day`, `deadline`) |
 | **Texas Legislature Online** calendars (`MyTLO/RSS/RSS.aspx`), the lists behind TLO's House Calendars page (`Calendars/CalendarsHouse.aspx`) and Senate Calendars page | `Type=upcomingcalendarshouse` or `upcomingcalendarssenate` | `tx_house` (House), `tx_lt_governor` (Senate), from `term_start` | The chamber | `tx_upcoming_events` (`floor_vote`) |
 | **Texas Legislature Online** committee meetings | `Members/MemberInfo.aspx` for the member's committees, then `Type=upcomingmeetingshouse` and `upcomingmeetingsjoint` | `tx_house`, from `term_start` | `tx_legislative_service.tlo_member_code`, then committee code | `tx_committee_memberships`, `tx_upcoming_events` (`committee_hearing`) |
 | **U.S. Senate** schedules (senate.gov) | `legislative/schedule/floor_schedule.htm` (next meeting) and `legislative/{year}_schedule.xml` (tentative schedule) | `us_senate`, from `term_start` | The office | `tx_upcoming_events` (`session_day`) |
 | **U.S. Senate** committee hearings | `legislative/LIS_MEMBER/cvc_member_data.xml` for the senator's committees, then `general/committee_schedules/hearings.xml` | `us_senate`, from `term_start` | `politicians.bioguide_id`, then committee code | `tx_committee_memberships`, `tx_upcoming_events` (`committee_hearing`) |
-| **Campaign events pages** | `politicians.campaign_events_url`: a Squarespace page read as `?format=json`, or a Mobilize page (`mobilize.us/{org}`) read through `api.mobilize.us/v1/organizations/{id}/events` | Every official, from `term_start` | The page linked from the campaign's own site | `tx_upcoming_events` (`appearance`, `is_campaign`) |
 
 X runs only when `tx_private_settings.x_bearer_token` is stored. Without it, each run notes that X
-posts were not checked. X is never scraped.
+posts were not checked. X is never scraped. X stays in Sync after the campaigns: it reads each
+official's own account through the API, the account they keep using in office, not a campaign site.
+
+**Campaign sites are no longer read.** Until the 2026 election, Sync read every campaign site's
+robots.txt, sitemaps and pages into `tx_watched_pages` and `tx_topic_findings` (`page`), and each
+campaign events page (`politicians.campaign_events_url`, Squarespace or Mobilize) into
+`tx_upcoming_events` (`appearance`, `is_campaign`). The campaigns are over and those pages will not
+gain new promises, so from 2026-11-20 Sync contacts no campaign site or campaign events page
+([#23](https://github.com/stozo04/tx-promise-tracker/issues/23)). Every row already captured stays
+as it is: it is the record of what each official stood for, to set against how they vote once sworn
+in. The columns `campaign_site_url`, `campaign_watch_urls` and `campaign_events_url` stay on
+`politicians`; Sync does not read them.
 
 ### Where each ID comes from
 
@@ -88,7 +95,6 @@ posts were not checked. X is never scraped.
 | `tec_filer_id` | TEC filer search (`filers.csv` in the TEC zip) | From the campaign treasurer appointment |
 | `tlo_member_code` | `capitol.texas.gov/Reports/BillsBy.aspx` author list (for example `Goodwin (H-A3820)`) | When the member is listed for the session; the code stays the same across sessions |
 | `journal_name` | The name the House Journal prints for the member that legislature | One `tx_legislative_service` row per legislature, sourced from the Legislative Reference Library |
-| `campaign_events_url` | The events page the campaign site's own menu links to (vikkigoodwin.com/events; the Mobilize pages linked from ginafortexas.com, jamestalarico.com and zach4texas.com) | Set in the events migration, checked 2026-11-09 |
 | Committee membership | The member's TLO page (`MemberInfo.aspx`) or senate.gov's member data, read by Sync into `tx_committee_memberships` | When the committees are appointed for the session (early in 2027) |
 
 When an ID is missing, the source writes a note that names the column and where to find it. It
@@ -113,21 +119,6 @@ never falls back to a name search.
 - **Executive orders.** Texas governors number their orders with their initials (GA-57 is Greg
   Abbott's). A post that links an order with another prefix (an earlier governor's) is noted and
   not stored. An order announced in several posts takes the date of the first one.
-- **Campaign pages.** A match of fewer than five words (a menu item, a button, a heading) is not
-  queued, and a passage is queued once per official and topic, not once for every page it appears
-  on. Without this, reading every page queued a site's "Cannabis & THC" menu label 233 times.
-- **Campaign sites are read politely.** Each site's robots.txt is read once per run, and its rules
-  for `PromiseVsDelivered` (else for `*`) decide which pages are read, with the longest matching
-  rule winning and `Allow` winning a tie. A robots.txt that answers 5xx or cannot be reached counts
-  as "disallow everything" for that run (RFC 9309); a 404 allows everything. Requests to one site
-  start at least 500 ms apart, or the site's `Crawl-delay` if longer, while other sites are read in
-  parallel. When a site answers 401, 403, 429 or 451, Sync stops sending it requests for the rest of
-  the run, writes one error (the first refused URL), and adds one note with how many of its pages
-  were skipped. Skipped pages keep their last status and are tried again next run, so a lifted block
-  is noticed. Sync never changes its user agent or address to get past a refusal. Before this,
-  ginafortexas.com's firewall refused all 204 of its pages every night from 2026-11-15, logging 204
-  errors a run, and six parallel requests drew 429s from zach4texas.com
-  ([#21](https://github.com/stozo04/tx-promise-tracker/issues/21)).
 - **Senate Journal.** The lieutenant governor is not a senator, so the journal lists them in a
   roll call only when they vote (a tie, or the Committee of the Whole). That is rare: none from
   1999 to 2025. Every day of the term is still read once.
@@ -150,7 +141,7 @@ never falls back to a name search.
 
 ### Events
 
-Five sources fill `tx_upcoming_events`, one per kind of event, each in the registry. All of them were
+Four sources fill `tx_upcoming_events`, one per kind of event, each in the registry. All of them were
 checked with real requests on 2026-11-09 before the parsers were written:
 
 - **TLO's RSS feeds** list every upcoming calendar and every posted committee meeting with a link to the
@@ -185,9 +176,6 @@ checked with real requests on 2026-11-09 before the parsers were written:
 - **The law's own text.** statutes.capitol.texas.gov is a JavaScript app; its texts are served as plain
   HTML from `tcss.legis.texas.gov/resources/{code}/htm/{chapter}.htm`. The Texas Legislative Council's
   "Dates of Interest" sheet lists the same convening day (2027-01-12, noon).
-- **Campaign events pages.** Goodwin's site is Squarespace (`/events?format=json` has `upcoming` and
-  `past`). The other three campaigns link a Mobilize page; Mobilize's public API lists its events. On
-  2026-11-09 every upcoming event on those pages was hosted by a party organization, not the campaign.
 
 Rules:
 
@@ -200,9 +188,8 @@ Rules:
   again each run.
 - **Cancelled only when the source says so** ("cancel" in a TLO item, or a Senate hearing typed or
   described as cancelled or postponed). An event that drops off a source that lists everything
-  upcoming (the TLO calendar and meeting feeds, senate.gov's hearing schedule, a campaign events page)
-  before its date is named in the run notes and left as it is. Dates set by law, the Senate's next
-  meeting and its tentative schedule are not checked for drop-offs. `held` is in the schema but Sync
+  upcoming (the TLO calendar and meeting feeds, senate.gov's hearing schedule) before its date is named in the run notes and left as it is. Dates
+  set by law, the Senate's next meeting and its tentative schedule are not checked for drop-offs. `held` is in the schema but Sync
   never sets it.
 - **One row per official per event.** `event_key` is shared by every official's row of the same event
   (`law:90R:convene` for the representative and the lieutenant governor); `external_id` is
@@ -211,13 +198,12 @@ Rules:
   joint), the session's dates. The lieutenant governor: Texas Senate calendars, the session's dates, the
   term start. The governor: the installation and the veto period. The senator: the Senate's next
   meeting, the tentative schedule's non-legislative periods (stored as session-day events titled "No
-  Senate session expected"), hearings of their committees, the term start. Everyone: their campaign's
-  events.
+  Senate session expected"), hearings of their committees, the term start.
 - **Which session.** Dates set by law are computed for one regular session: the one in progress, or
   the next one. A session stays current until its veto period ends (20 days after its 140th day).
 - **Before the term starts**, only events that concern the office are stored: the convening of a session
-  the official will sit in, and the day the term begins. Floor calendars, hearings, Senate meetings and
-  campaign events are stored from `term_start` on.
+  the official will sit in, and the day the term begins. Floor calendars, hearings and Senate meetings are
+  stored from `term_start` on.
 - **Dates set by law** are computed only as the law states them, from the sentence each rule depends
   on. If that sentence is not found word for word in the current text, the dates that depend on it are
   not loaded and the run says why. Each row carries `legal_basis`, `legal_url` and `computed_from`:
@@ -233,24 +219,23 @@ Rules:
 - **Times.** A time is stored only when the source gives one. TLO times are Central; Senate times are
   Eastern and converted, with the Senate's own wording kept in `details`. A TLO time like "2:30 PM or
   upon final adjourn." is stored as 2:30 PM with the full wording in `details`.
-- **Campaign events** keep only events the campaign's own organization hosts, labeled as campaign events
-  (`is_campaign`), with the date, time, place and title as the page states them.
+- **Campaign events** stored before the election, if any, stay, labeled as campaign events (`is_campaign`).
+  No source writes new ones, and the Events page names no campaign source as "not loaded".
 - **Bills a Senate hearing names** are kept for every type senate.gov lists (S, HR, SJRES, HJRES, SRES,
   HRES, SCONRES, HCONRES; nominations are not bills). The event page links each to Congress.gov for
   the Congress in session on the hearing's date ("121st-congress"), and shows any other as text.
 - **"Not loaded yet."** Each source owns the `event_key`s it writes (`law:`, `tlo_calendar:{session}:H:`
   for the House, `tlo_calendar:{session}:S:` for the Senate, `tlo_hearing:`, `senate_floor:`,
-  `senate_schedule:`, `senate_hearing:`, `campaign:`). The Events page and the Upcoming tab call a source
-  loaded only when one of its own events is, so one source's events never hide another that has none
-  (House calendars never make the Senate's look loaded). The Events page links each unloaded source
+  `senate_schedule:`, `senate_hearing:`; `campaign:` rows stay from before the election). The Events
+  page and the Upcoming tab call a source loaded only when one of its own events is, so one source's
+  events never hide another that has none (House calendars never make the Senate's look loaded). The Events page links each unloaded source
   to the page that lists it when there is one (the House calendars to `Calendars/CalendarsHouse.aspx`).
   A new event source adds its pattern and page to `lib/event-sources.ts`.
 - **Committee membership** is stored, never guessed: a hearing is matched only by committee code (and,
   for TLO, the same legislature, so a committee carries over into its called sessions). Until the
   representative's `tlo_member_code` for the 90th Legislature and the senator's `bioguide_id` are
   stored, the run notes say so and no hearings are loaded.
-- **Run notes.** Every run notes, per official, what each events page listed and how many of its
-  events were kept; what each TLO feed said when nothing is posted, and any feed item in a format the
+- **Run notes.** Every run notes what each TLO feed said when nothing is posted, and any feed item in a format the
   parser does not read; when no floor calendars are posted yet; a missing ID or committee list; a law text
   that no longer reads as expected; and a tentative Senate schedule that is not published yet.
 
@@ -277,9 +262,7 @@ flowchart LR
     GOV["Office of the Governor"]
     TEC["Texas Ethics Commission zip"]
   end
-  subgraph Campaign["Officials' own words"]
-    SITE["Campaign sitemaps and pages"]
-    EVP["Campaign events pages (site or Mobilize)"]
+  subgraph Words["Officials' own words"]
     X["X API, only with a stored token"]
   end
   LAW["Law texts: Texas statutes and Constitution, U.S. Constitution"]
@@ -299,14 +282,12 @@ flowchart LR
   TLO -- "calendars, committee meetings" --> EV[("tx_upcoming_events")]
   SEN -- "floor schedule, hearings" --> EV
   LAW -- "dates set by law" --> EV
-  EVP -- "campaign-hosted events" --> EV
-  SITE --> PAGES[("tx_watched_pages")]
-  PAGES -- "changed text, keyword match" --> FIND
   X -- "keyword match" --> FIND
   FIND -. "a person checks the quote and source" .-> PROM[("Promises on the site")]
 ```
 
-The dotted line is manual. A finding is never published as a promise by Sync.
+The dotted line is manual. A finding is never published as a promise by Sync. Findings captured from
+campaign pages before the election stay in `tx_topic_findings`, but no stage adds to them.
 
 ## 2. How a run starts
 
@@ -388,17 +369,12 @@ stage is written to the errors. A retried call does not count as one of the stag
 
 1. For each official, each source the registry lists for their office (`sourcesFor(office)`), in
    registry order: records and money first, then the event sources (`events_law`,
-   `events_tx_floor`, `events_tx_hearings`, `events_senate_floor`, `events_senate_hearings`,
-   `events_campaign`).
+   `events_tx_floor`, `events_tx_hearings`, `events_senate_floor`, `events_senate_hearings`).
 2. `topics_bills`: watched bills on Texas Legislature Online, with House record votes for every
    official who served in that legislature.
-3. `topics_sitemaps`: read each campaign site's robots.txt, then list its pages.
-4. `topics_pages`: read pages in batches of 100, repeated until every page has been read or skipped
-   this run. Each site's robots.txt result and any refusal travel in the run's carry (`sites`), so
-   later batches neither ask again nor contact a site that refused.
-5. `topics_x`: X posts, if a token is stored.
+3. `topics_x`: X posts, if a token is stored.
 
-A source with a backlog (journal days, roll calls, TEC files, pages) returns `more`, and the run
+A source with a backlog (journal days, roll calls, TEC files) returns `more`, and the run
 calls it again, up to 20 times, while the run's 370-second budget lasts. Anything left continues
 the next day, oldest first.
 
@@ -410,14 +386,14 @@ In a `finally` block, so it runs even after errors:
 | --- | --- |
 | `finished_at` | When the run ended |
 | `triggered_by` | `button` or `schedule` |
-| `counts` | `fec_summaries`, `fec_contributions`, `congress_sponsored`, `congress_cosponsored`, `senate_votes`, `house_votes`, `house_journal_days`, `tlo_bills`, `governor_actions`, `executive_orders`, `senate_journal_votes`, `senate_journal_days`, `tec_reports`, `tec_files_read`, `tec_batches_read`, `tec_summaries`, `tec_contributions`, `topic_bills_checked`, `topic_pages_checked`, `topic_pages_changed`, `topic_pages_skipped`, `topic_posts_checked`, `topic_matches`, `events_added`, `events_changed` |
+| `counts` | `fec_summaries`, `fec_contributions`, `congress_sponsored`, `congress_cosponsored`, `senate_votes`, `house_votes`, `house_journal_days`, `tlo_bills`, `governor_actions`, `executive_orders`, `senate_journal_votes`, `senate_journal_days`, `tec_reports`, `tec_files_read`, `tec_batches_read`, `tec_summaries`, `tec_contributions`, `topic_bills_checked`, `topic_posts_checked`, `topic_matches`, `events_added`, `events_changed` |
 | `errors` | `{ source, message }` for each source that failed |
 | `notes` | One line per skipped source, missing ID, or backlog |
 
 ### What visitors see
 
 "Last run results" (`syncSummary` in `lib/sync.ts`) shows when the run finished and whether the
-nightly schedule started it, pages and bills checked, **each failed source with its message**, and
+nightly schedule started it, watched bills checked, **each failed source with its message**, and
 **every run note**, plus per official and per topic how many matches the last run found and how
 many findings wait for review. It is checked in both light and dark mode.
 
@@ -444,13 +420,9 @@ The Events page's footer shows the last Sync time.
 | Governor posts per batch | 80 | `MAX_POSTS_PER_CALL` |
 | Requests to the TEC | 15 per run, 4 seconds apart | `MAX_TEC_REQUESTS_PER_RUN`, `TEC_REQUEST_GAP_MS` |
 | TEC contribution rows parsed per call | 50,000 | `TEC_ROWS_PER_CALL` |
-| Campaign pages per batch | 100, 6 at a time across sites | `PAGE_BATCH`, `PAGE_CONCURRENCY` |
-| Requests to one campaign site | One start every 500 ms, or the site's `Crawl-delay` | `MIN_SITE_GAP_MS`, `siteGapMs` |
-| A campaign site that refuses (401, 403, 429, 451) | No more requests to it this run, one error | `REFUSAL_STATUSES` |
-| URLs taken from one sitemap | 600 | `MAX_SITEMAP_URLS` |
-| Excerpts per page and topic | 10 | `MAX_FINDINGS_PER_PAGE_TOPIC` |
+| Excerpts per post and topic | 10 | `MAX_FINDINGS_PER_TEXT_TOPIC` |
 | Bill actions queued | Last 30 days | `BILL_ACTION_WINDOW_DAYS` |
-| Requests per events stage, one at a time | Law texts: 1 (senator) to 3 (each distinct law page once). TLO calendars: 1. TLO hearings: the member page plus 2 feeds. Senate floor: the floor schedule plus 2 schedule years. Senate hearings: member data plus hearings. Campaign events: 1 (Squarespace) or 2 (Mobilize page plus API) | `events_*.ts` |
+| Requests per events stage, one at a time | Law texts: 1 (senator) to 3 (each distinct law page once). TLO calendars: 1. TLO hearings: the member page plus 2 feeds. Senate floor: the floor schedule plus 2 schedule years. Senate hearings: member data plus hearings. | `events_*.ts` |
 
 All requests send the user agent
 `PromiseVsDelivered/1.0 (+https://github.com/stozo04/tx-promise-tracker)`.
@@ -465,16 +437,15 @@ deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/
 deno run --allow-net --allow-env=DATA_GOV_KEY --node-modules-dir=none scripts/sync-live-check.ts
 ```
 
-The tests run on real pages saved from each source (`tests/fixtures`): 59 tests, of which G1 to G10
-cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. S2 covers
-robots.txt rules (the two campaign sites' real files, an agent-specific group, wildcards), sitemaps
-taken from robots.txt, per-site spacing, and which statuses count as a refusal. G2 also covers
+The tests run on real pages saved from each source (`tests/fixtures`): 54 tests, of which G1 to G10
+cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. S3 checks that
+no stage reads a campaign site, its sitemap, its pages or its events page, and that the Events page
+names no campaign source as "not loaded". G2 also covers
 every TLO feed as the live site served it between sessions (2026-11-09 and 2026-11-10), an item in an
 unknown format, and a Sync run on an empty House calendars feed. B1 also checks that a TEC file
 read in batches, with the carry passed as JSON between calls, adds up to the same parts as one read,
 that matching lines come in file order whatever the chunking, and that rows of other filers and of replaced reports are dropped before they are parsed. CI runs them on every pull request. Strip any keys a
-saved page embeds before committing it (a Mobilize page carries Mapbox, Google, Algolia and Facebook
-browser keys; GitHub push protection blocks them). The live check reads the real sources and prints statistics; it writes nothing. Its `events`
+saved page embeds before committing it (GitHub push protection blocks them). The live check reads the real sources and prints statistics; it writes nothing. Its `events`
 section (`scripts/sync-live-check.ts events`) prints, for each event source, how many items it parsed
 against how many the page lists, and a sample. For TLO's feeds it also prints the "nothing posted" item
 and how many items the parser could not read; a nonzero "not read" means the live format changed.

@@ -16,7 +16,6 @@ export const EVENT_SOURCES: { kind: string; offices: string[]; keys: RegExp; sou
   { kind: "committee_hearing", offices: ["tx_house"], keys: /^tlo_hearing:/, source: "Texas Legislature Online committee meeting notices", href: "https://capitol.texas.gov/Committees/MeetingsUpcoming.aspx?Chamber=H" },
   { kind: "committee_hearing", offices: ["us_senate"], keys: /^senate_hearing:/, source: "senate.gov committee hearing schedules", href: "https://www.senate.gov/committees/hearings_meetings.htm" },
   { kind: "deadline", offices: ["tx_house", "tx_lt_governor", "governor", "us_senate"], keys: /^law:/, source: "dates the Texas Constitution, the Government Code and the U.S. Constitution set" },
-  { kind: "appearance", offices: ["tx_house", "tx_lt_governor", "governor", "us_senate"], keys: /^campaign:/, source: "each campaign's own events page" },
 ];
 
 function sourcesShown(offices: string[], kind: string) {

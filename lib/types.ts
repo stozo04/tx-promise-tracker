@@ -32,9 +32,9 @@ export type Politician = {
   portrait_url?: string | null;
   portrait_credit?: string | null;
   portrait_source_url?: string | null;
-  /** The campaign's own events page, linked from its site. Sync reads appearances from it. */
+  /** The campaign's own events page, linked from its site. Sync stopped reading it when the campaigns ended. */
   campaign_events_url?: string | null;
-  /** Campaign pages outside the main sitemap (petition subdomains) that Sync reads for topics. */
+  /** Campaign pages outside the main sitemap (petition subdomains) that Sync read for topics during the campaign. */
   campaign_watch_urls?: string[];
   status: string;
   created_at: string;

@@ -1,5 +1,5 @@
-// Shared pieces for the event sources (events_law.ts, events_texas.ts, events_senate.ts,
-// events_campaign.ts): the row shape, Central-time conversion, and the refresh rule.
+// Shared pieces for the event sources (events_law.ts, events_texas.ts, events_senate.ts): the row
+// shape, Central-time conversion, and the refresh rule.
 //
 // Unlike votes, events are refreshed: schedules change, so a row is upserted on external_id and
 // `updated_at` is set when its date, time, place, agenda or status changed. An event that is no

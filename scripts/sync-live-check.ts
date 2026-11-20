@@ -5,7 +5,6 @@
 //
 // Sections: house tlo governor senate congress fec tec events (all by default). Congress.gov and FEC use
 // api.data.gov's public DEMO_KEY unless DATA_GOV_KEY is set, so keep repeat runs light.
-import { mobilizeEvents, mobilizeOrganization, squarespaceEvents, squarespacePast } from "../supabase/functions/tx_sync/events_campaign.ts";
 import { LAWS, type LawKey, lawText, legalEvents, verifiedLaws } from "../supabase/functions/tx_sync/events_law.ts";
 import { parseFloorSchedule, parseSenateHearings, parseTentativeSchedule, SENATE_FLOOR_SCHEDULE, SENATE_HEARINGS, SENATE_MEMBERS, senateScheduleUrl, senatorCommittees } from "../supabase/functions/tx_sync/events_senate.ts";
 import { calendarDoc, checkFeed, memberCommittees, meetingOf, parseCalendarFeed, parseMeetingFeed, TLO_RSS } from "../supabase/functions/tx_sync/events_texas.ts";
@@ -200,12 +199,5 @@ if (wanted.has("events")) {
   const today = centralDate(new Date());
   for (const [office, start] of [["tx_house", "2027-01-12"], ["tx_lt_governor", "2027-01-19"], ["governor", "2027-01-19"], ["us_senate", "2027-01-03"]]) {
     console.log(`G5 ${office}:`, legalEvents(office, today, verified, start).map((d) => `${d.starts_on} ${d.title} [${d.legal_basis}]`));
-  }
-  const goodwin = await http.json("https://www.vikkigoodwin.com/events?format=json");
-  console.log(`G6 vikkigoodwin.com/events: ${squarespaceEvents(goodwin, "https://www.vikkigoodwin.com").length} upcoming, ${squarespacePast(goodwin, "https://www.vikkigoodwin.com").length} past on the first page`);
-  for (const slug of ["ginahinojosafortexasgovernor", "talaricofortexas", "zach4texas"]) {
-    const org = mobilizeOrganization((await http.text(`https://www.mobilize.us/${slug}/`)).text);
-    const json = (await http.json(`https://api.mobilize.us/v1/organizations/${org}/events?timeslot_start=gte_now&per_page=100`)) as { data: { sponsor: { id: number } }[] };
-    console.log(`G6 mobilize.us/${slug} (org ${org}): ${json.data.length} upcoming listed, ${json.data.filter((e) => e.sponsor.id === org).length} hosted by the campaign, ${mobilizeEvents(json, org!).length} time slots kept`);
   }
 }
