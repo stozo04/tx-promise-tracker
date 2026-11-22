@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
+import { SITE_ARCHIVE_ASSET_EXTENSIONS, siteArchiveBase } from "./lib/site-archive";
 
-const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
-  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
-  : "bqyfplifeyvkilkoneph.supabase.co";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://bqyfplifeyvkilkoneph.supabase.co";
+const supabaseHost = new URL(supabaseUrl).hostname;
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
@@ -10,6 +10,18 @@ const nextConfig: NextConfig = {
   // The preview is opened at 127.0.0.1. Next only allows localhost by default,
   // and a blocked dev socket keeps the page from hydrating.
   allowedDevOrigins: ["127.0.0.1"],
+  async rewrites() {
+    return {
+      beforeFiles: [],
+      afterFiles: [
+        {
+          source: `/archive/:asset(.+\\.(?:${SITE_ARCHIVE_ASSET_EXTENSIONS.join("|")}))`,
+          destination: `${siteArchiveBase(supabaseUrl)}/:asset`,
+        },
+      ],
+      fallback: [],
+    };
+  },
   images: {
     remotePatterns: [
       {
