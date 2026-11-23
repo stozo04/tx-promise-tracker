@@ -18,7 +18,7 @@
 // Reports a later report replaced (infoOnlyFlag = Y) are left out.
 import { fecCycles } from "./federal.ts";
 import { bump, type Ctx, type Politician, upsert } from "./shared.ts";
-import { csvFields, csvReader, entryText, grepLines, listZip, type ZipEntry } from "./tec_zip.ts";
+import { csvFields, csvReader, entryText, grepLines, listZip, TecRefused, type ZipEntry } from "./tec_zip.ts";
 
 const NOT_AN_EMPLOYER =
   /^(NOT[ -]?EMPLOYED|UNEMPLOYED|NONE|NULL|N\/?A|SELF[ -]?EMPLOYED|SELF|RETIRED|HOMEMAKER|STUDENT|INFORMATION REQUESTED.*|REQUESTED|BEST EFFORTS.*|-+)$/i;
@@ -293,27 +293,49 @@ export function filesForReport(files: { name: string; first: string }[], receive
  * Requests to the TEC per run. Its CDN refuses byte ranges (403) after a burst of requests, so a
  * run stays well under that and spaces requests out; a backfill continues over the next runs.
  */
-export const MAX_TEC_REQUESTS_PER_RUN = 15;
-const TEC_REQUEST_GAP_MS = 4_000;
+export const MAX_TEC_REQUESTS_PER_RUN = 10;
+const TEC_REQUEST_GAP_MS = 6_000;
+const ZIP_DIRECTORY_REQUESTS = 2;
 
 const pause = () => new Promise((resolve) => setTimeout(resolve, TEC_REQUEST_GAP_MS));
 
-type TecCarry = { batchRequests: number; cursor: ContribsCursor | null };
+export type TecCarry = { batchRequests: number; cursor: ContribsCursor | null; refused?: boolean };
+
+export function requestsUsed(rows: { name: string; fetched_at: string | null }[], runStartedAt: string, batchRequests: number) {
+  return rows.filter((row) => row.fetched_at && row.fetched_at >= runStartedAt).reduce((n, row) => n + (row.name === "_zip" ? ZIP_DIRECTORY_REQUESTS : 1), batchRequests);
+}
+
+export async function untilRefused(ctx: Ctx, step: (carry: TecCarry) => Promise<boolean>) {
+  const carry = (ctx.carry.tec ??= { batchRequests: 0, cursor: null }) as TecCarry;
+  if (carry.refused) return false;
+  try {
+    return await step(carry);
+  } catch (err) {
+    if (!(err instanceof TecRefused)) throw err;
+    carry.refused = true;
+    bump(ctx.log, "tec_refused");
+    ctx.log.notes.push(`Texas Ethics Commission: the TEC refused more downloads this run (${err.message}). Reading continues next run.`);
+    return false;
+  }
+}
 
 export async function tec(ctx: Ctx, p: Politician) {
   if (!p.tec_filer_id) {
     ctx.log.notes.push(`Texas Ethics Commission: no tec_filer_id is stored for ${p.name}. Add it from the TEC filer search.`);
     return false;
   }
+  return await untilRefused(ctx, (carry) => readTec(ctx, p, p.tec_filer_id!, carry));
+}
+
+async function readTec(ctx: Ctx, p: Politician, filerId: string, carry: TecCarry) {
   const { data: filers } = await ctx.db.from("politicians").select("id, tec_filer_id").not("tec_filer_id", "is", null);
   const people = (filers ?? []) as { id: string; tec_filer_id: string }[];
   const needles = people.map((row) => `,${row.tec_filer_id},`);
-  const carry = (ctx.carry.tec ??= { batchRequests: 0, cursor: null }) as TecCarry;
   let state = await fileRows(ctx);
-  let used = [...state.values()].filter((row) => row.fetched_at && row.fetched_at >= ctx.runStartedAt).length + carry.batchRequests;
+  let used = requestsUsed([...state.values()], ctx.runStartedAt, carry.batchRequests);
   const budgetLeft = () => used < MAX_TEC_REQUESTS_PER_RUN;
-  const spent = async (rows: Partial<FileRow>[]) => {
-    used++;
+  const spent = async (rows: Partial<FileRow>[], requests = 1) => {
+    used += requests;
     await saveFiles(ctx, rows.map((row) => ({ ...row, fetched_at: new Date().toISOString() })));
   };
 
@@ -327,7 +349,7 @@ export async function tec(ctx: Ctx, p: Politician) {
       const same = old?.crc === e.crc;
       return { name: e.name, crc: e.crc, offset: e.offset, compressed_size: e.compressedSize, size: e.size, method: e.method, first_received: same ? old.first_received : null, read_crc: old?.read_crc ?? null };
     }));
-    await spent([{ name: "_zip", crc: zip.lastModified, read_crc: zip.url }]);
+    await spent([{ name: "_zip", crc: zip.lastModified, read_crc: zip.url }], ZIP_DIRECTORY_REQUESTS);
     zipUrl = zip.url;
     state = await fileRows(ctx);
   }
@@ -357,7 +379,7 @@ export async function tec(ctx: Ctx, p: Politician) {
   const { data: reportData, error: reportError } = await ctx.db
     .from("tx_tec_reports")
     .select("report_id, filer_ident, report_type, received_on, period_start, period_end, total_contrib, unitemized_contrib, cash_on_hand, info_only")
-    .eq("filer_ident", p.tec_filer_id);
+    .eq("filer_ident", filerId);
   if (reportError) throw new Error(`tx_tec_reports: ${reportError.message}`);
   const reports = ((reportData ?? []) as TecReport[]).map((r) => ({ ...r, report_id: Number(r.report_id) }));
   const wanted = reports.filter((r) => !r.info_only && cycles.includes(reportCycle(r)) && (r.total_contrib ?? 0) > (r.unitemized_contrib ?? 0));
@@ -425,7 +447,7 @@ export async function tec(ctx: Ctx, p: Politician) {
   const { data: partData, error: partError } = await ctx.db
     .from("tx_tec_report_parts")
     .select("report_id, itemized_total, in_state_total, employers, top_gifts")
-    .eq("filer_ident", p.tec_filer_id);
+    .eq("filer_ident", filerId);
   if (partError) throw new Error(`tx_tec_report_parts: ${partError.message}`);
   for (const cycle of cycles) {
     const result = summarize(p.id, cycle, reports, (partData ?? []) as PartRow[]);

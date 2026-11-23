@@ -1,6 +1,6 @@
 // Unit tests for Sync, one block per SYNC-CHECKLIST.md item. Fixtures in ./fixtures are real pages
 // and files from the primary sources, saved on 2026-11-09. Run: deno test --allow-read (see README).
-import { assert, assertEquals, assertExists } from "jsr:@std/assert@1";
+import { assert, assertEquals, assertExists, assertRejects } from "jsr:@std/assert@1";
 
 import { congressBillUrl, congressOn, ordinal as ordinalSuffix, sourceHref, unloadedSources } from "../../../../lib/event-sources.ts";
 import { cooldownRemaining, nextCentralMidnight, runErrors, runNotes, syncSummary } from "../../../../lib/sync.ts";
@@ -16,8 +16,8 @@ import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature 
 import { TOPIC_STEPS } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
 import { RATE_LIMIT_PAD_MS, rateLimitRetryMs, slotWaitMs, STAGE_CALL_WINDOW_MS, STAGE_CALLS_PER_WINDOW } from "../stage_pacing.ts";
-import { contribsFilter, coverRow, filesForReport, partBuilder, readContribs, reportCycle, summarize, tecReportUrl, type TecReport } from "../tec.ts";
-import { csvFields, csvReader, grepLines } from "../tec_zip.ts";
+import { contribsFilter, coverRow, filesForReport, MAX_TEC_REQUESTS_PER_RUN, partBuilder, readContribs, reportCycle, requestsUsed, summarize, tecReportUrl, type TecReport, untilRefused } from "../tec.ts";
+import { csvFields, csvReader, grepLines, listZip, TecRefused } from "../tec_zip.ts";
 import { authorDate, houseVoteRows, parseAuthorReport, parseReportRows, tloSessions } from "../texas.ts";
 
 const fixture = (name: string) => Deno.readTextFile(new URL(`./fixtures/${name}`, import.meta.url));
@@ -314,6 +314,57 @@ Deno.test("B1: a report is looked for by the day it was received: the file that 
   assertEquals(filesForReport(files, "2026-10-06"), ["contribs_111.csv"]);
   assertEquals(filesForReport(files, "2026-10-26"), ["contribs_111.csv", "contribs_112.csv", "contribs_113.csv"]);
   assertEquals(filesForReport(files, "2025-07-15"), []);
+});
+
+Deno.test("B1: a 403 or 429 from the TEC's CDN is a refusal, and any other failure stays an error (issue #27)", async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    for (const [status, refused] of [[403, true], [429, true], [500, false], [200, false]] as const) {
+      globalThis.fetch = ((_url: string | URL | Request, init?: RequestInit) =>
+        Promise.resolve(init?.method === "HEAD" ? new Response(null, { status: 200, headers: { "content-length": "1000000" } }) : new Response("no", { status }))) as typeof fetch;
+      const err = await assertRejects(() => listZip("https://example.test/TEC_CF_CSV.zip"));
+      assertEquals(err instanceof TecRefused, refused, `range ${status}`);
+      globalThis.fetch = (() => Promise.resolve(new Response(null, { status }))) as typeof fetch;
+      const headErr = await assertRejects(() => listZip("https://example.test/TEC_CF_CSV.zip"));
+      assertEquals(headErr instanceof TecRefused, refused, `HEAD ${status}`);
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+Deno.test("B1: after a refusal the run makes no more TEC requests, notes it once, and logs no error (issue #27)", async () => {
+  const log: Log = { counts: {}, errors: [], notes: [] };
+  const ctx = { log, carry: {} } as unknown as Ctx;
+  let steps = 0;
+  assertEquals(await untilRefused(ctx, () => Promise.resolve(++steps > 0)), true);
+  assertEquals(await untilRefused(ctx, () => {
+    steps++;
+    return Promise.reject(new TecRefused("403 for a byte range of the TEC zip (expected 206)"));
+  }), false);
+  for (let i = 0; i < 3; i++) assertEquals(await untilRefused(ctx, () => Promise.resolve(++steps > 0)), false);
+  assertEquals(steps, 2);
+  assertEquals(log.counts.tec_refused, 1);
+  assertEquals(log.errors, []);
+  assertEquals(log.notes.length, 1);
+  assert(log.notes[0].includes("continues next run"));
+
+  const other = { log: { counts: {}, errors: [], notes: [] }, carry: {} } as unknown as Ctx;
+  await assertRejects(() => untilRefused(other, () => Promise.reject(new Error("500 for a byte range of the TEC zip (expected 206)"))), Error, "500");
+});
+
+Deno.test("B1: the zip's directory counts as two requests, and a run stays under the CDN's limit (issue #27)", () => {
+  const run = "2026-11-23T05:30:00.000Z";
+  const rows = [
+    { name: "_zip", fetched_at: "2026-11-23T05:30:05.000Z" },
+    { name: "cover.csv", fetched_at: "2026-11-23T05:30:12.000Z" },
+    { name: "contribs_109.csv", fetched_at: "2026-11-23T05:30:20.000Z" },
+    { name: "contribs_108.csv", fetched_at: "2026-11-22T05:30:20.000Z" },
+    { name: "contribs_107.csv", fetched_at: null },
+  ];
+  assertEquals(requestsUsed(rows, run, 0), 4);
+  assertEquals(requestsUsed(rows, run, 3), 7);
+  assert(MAX_TEC_REQUESTS_PER_RUN <= 10, "the CDN refused after 13 to 15 requests on 2026-11-22 and 2026-11-23");
 });
 
 Deno.test("B1: a cycle's summary leaves out replaced reports and links the latest report", () => {

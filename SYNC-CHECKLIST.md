@@ -131,9 +131,11 @@ shown.
     - Live run: **9 of 9 fully read reports match their cover sheets to the cent** (Goodwin and
       Hinojosa, 45 to 141,908 rows each). A 10th is half read, as expected: its rows continue in a
       file not read yet.
-    - Still open: the TEC's CDN refused byte ranges (403) after about 70 requests in the first run
-      and about 17 in a catch-up. Sync now keeps the zip directory and makes at most 15 requests
-      per run. A file with more than 50,000 matching rows is read over several calls in the same run
+    - Still open: the TEC's CDN refuses byte ranges (403) after a burst: about 70 requests in the
+      first run, about 17 in a catch-up, and 13 to 15 on 2026-11-22 and 2026-11-23, after the TEC
+      rebuilt its whole export and every file had to be looked at again (issue #27). Sync keeps the
+      zip directory, makes at most 10 requests per run, 6 seconds apart, and treats a refusal as
+      "continue next run", not as an error. A file with more than 50,000 matching rows is read over several calls in the same run
       (each call has 2 seconds of CPU; `contribs_112.csv` ran out of it on 2026-11-12, issue #15). The remaining files (about 15) are read over the next
       daily runs; the summaries are written when an official's files are all read. Check
       `tx_contribution_summaries` for the three state officials after those runs.

@@ -6,10 +6,14 @@ export const TEC_ZIP_URL = "https://prd.tecprd.ethicsefile.com/public/cf/public/
 
 export type ZipEntry = { name: string; crc: string; method: number; compressedSize: number; size: number; offset: number };
 
+export class TecRefused extends Error {}
+
 async function range(url: string, start: number, end: number) {
   const res = await fetch(url, { headers: { "User-Agent": UA, Range: `bytes=${start}-${end}` }, signal: AbortSignal.timeout(60_000) });
-  if (res.status !== 206) throw new Error(`${res.status} for a byte range of the TEC zip (expected 206)`);
-  return res;
+  if (res.status === 206) return res;
+  await res.body?.cancel().catch(() => {});
+  const message = `${res.status} for a byte range of the TEC zip (expected 206)`;
+  throw res.status === 403 || res.status === 429 ? new TecRefused(message) : new Error(message);
 }
 
 /** The zip's central directory: every file, its CRC, sizes, and where its data starts. */
@@ -72,6 +76,7 @@ export function parseCentralDirectory(tail: Uint8Array, tailStart: number): ZipE
 export async function headZip(url = TEC_ZIP_URL) {
   const head = await fetch(url, { method: "HEAD", headers: { "User-Agent": UA }, redirect: "follow", signal: AbortSignal.timeout(30_000) });
   const length = Number(head.headers.get("content-length"));
+  if (head.status === 403 || head.status === 429) throw new TecRefused(`${head.status} for the TEC zip (HEAD)`);
   if (!head.ok || !length) throw new Error(`${head.status} for the TEC zip (HEAD)`);
   return { url: head.url, lastModified: head.headers.get("last-modified") ?? "", length };
 }
