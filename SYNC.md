@@ -126,9 +126,14 @@ never falls back to a name search.
   read again only when its CRC changes, and only files that hold the official's reports are read.
   Files run in the order reports arrived, so a report is looked for by the day it was received
   (report IDs are not in file order). The TEC's CDN refuses byte ranges (403) after a burst of
-  requests, so Sync reads the zip's directory once per run (kept in `tx_tec_files`) and makes at
-  most 15 requests per run, 4 seconds apart. The first backfill therefore takes a few daily runs;
-  after that a day needs only a handful of requests.
+  requests: after 13 to 15 on 2026-11-22 and 2026-11-23. So Sync reads the zip's directory once
+  per run (kept in `tx_tec_files`; a HEAD and a range, counted as two requests) and makes at most
+  10 requests per run, 6 seconds apart. If the CDN still refuses (403 or 429), the rest of the run
+  makes no TEC request, the run notes it and counts `tec_refused`, and reading continues next run
+  with everything read before the refusal kept; it is not an error. A backfill, or a catch-up after
+  the TEC rebuilds its whole export (it did around 2026-11-21, which changed every file's CRC),
+  therefore takes a few daily runs; after that a day needs only a handful of requests. Downloading
+  the whole zip instead is not possible: it is about 1 GB and a stage call has 2 seconds of CPU.
 - **TEC, long files.** A stage call has 2 seconds of CPU, and parsing every matching row of a busy
   file takes more: `contribs_112.csv` (57 MB, the 8-day reports filed from 2026-10-26; Hinojosa's
   alone is 229,722 rows) ran out of CPU in every stage on 2026-11-12. So rows of other filers, rows that are not
@@ -136,7 +141,7 @@ never falls back to a name search.
   seven fields before a row is parsed, and one call parses at most 50,000 kept rows. A file with
   more goes on in the next call, which requests the file again, skips the rows already counted,
   and adds to the totals carried from the call before. The file's parts are written, and its CRC
-  marked read, only when its last rows are in. Each of those extra requests counts toward the 15.
+  marked read, only when its last rows are in. Each of those extra requests counts toward the 10.
   If the run ends partway through a file, the next run reads that file again from its first row.
 
 ### Events
@@ -386,7 +391,7 @@ In a `finally` block, so it runs even after errors:
 | --- | --- |
 | `finished_at` | When the run ended |
 | `triggered_by` | `button` or `schedule` |
-| `counts` | `fec_summaries`, `fec_contributions`, `congress_sponsored`, `congress_cosponsored`, `senate_votes`, `house_votes`, `house_journal_days`, `tlo_bills`, `governor_actions`, `executive_orders`, `senate_journal_votes`, `senate_journal_days`, `tec_reports`, `tec_files_read`, `tec_batches_read`, `tec_summaries`, `tec_contributions`, `topic_bills_checked`, `topic_posts_checked`, `topic_matches`, `events_added`, `events_changed` |
+| `counts` | `fec_summaries`, `fec_contributions`, `congress_sponsored`, `congress_cosponsored`, `senate_votes`, `house_votes`, `house_journal_days`, `tlo_bills`, `governor_actions`, `executive_orders`, `senate_journal_votes`, `senate_journal_days`, `tec_reports`, `tec_files_read`, `tec_batches_read`, `tec_refused`, `tec_summaries`, `tec_contributions`, `topic_bills_checked`, `topic_posts_checked`, `topic_matches`, `events_added`, `events_changed` |
 | `errors` | `{ source, message }` for each source that failed |
 | `notes` | One line per skipped source, missing ID, or backlog |
 
@@ -418,7 +423,7 @@ The Events page's footer shows the last Sync time.
 | New TLO bills per batch | 60 | `MAX_NEW_BILLS_PER_RUN` |
 | Bill histories per governor batch | 80 | `MAX_HISTORIES_PER_CALL` |
 | Governor posts per batch | 80 | `MAX_POSTS_PER_CALL` |
-| Requests to the TEC | 15 per run, 4 seconds apart | `MAX_TEC_REQUESTS_PER_RUN`, `TEC_REQUEST_GAP_MS` |
+| Requests to the TEC | 10 per run, 6 seconds apart; none after a refusal | `MAX_TEC_REQUESTS_PER_RUN`, `TEC_REQUEST_GAP_MS` |
 | TEC contribution rows parsed per call | 50,000 | `TEC_ROWS_PER_CALL` |
 | Excerpts per post and topic | 10 | `MAX_FINDINGS_PER_TEXT_TOPIC` |
 | Bill actions queued | Last 30 days | `BILL_ACTION_WINDOW_DAYS` |
