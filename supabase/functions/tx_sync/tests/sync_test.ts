@@ -16,7 +16,7 @@ import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature 
 import { TOPIC_STEPS } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
 import { RATE_LIMIT_PAD_MS, rateLimitRetryMs, slotWaitMs, STAGE_CALL_WINDOW_MS, STAGE_CALLS_PER_WINDOW } from "../stage_pacing.ts";
-import { contribsFilter, coverRow, filesForReport, MAX_TEC_REQUESTS_PER_RUN, partBuilder, readContribs, reportCycle, requestsUsed, summarize, tecReportUrl, type TecReport, untilRefused } from "../tec.ts";
+import { contribsFilter, coverRow, directoryRow, filesForReport, MAX_TEC_REQUESTS_PER_RUN, partBuilder, readContribs, reportCycle, requestsUsed, spillFiles, summarize, tecReportUrl, type TecReport, untilRefused } from "../tec.ts";
 import { csvFields, csvReader, grepLines, listZip, TecRefused } from "../tec_zip.ts";
 import { authorDate, houseVoteRows, parseAuthorReport, parseReportRows, tloSessions } from "../texas.ts";
 
@@ -314,6 +314,30 @@ Deno.test("B1: a report is looked for by the day it was received: the file that 
   assertEquals(filesForReport(files, "2026-10-06"), ["contribs_111.csv"]);
   assertEquals(filesForReport(files, "2026-10-26"), ["contribs_111.csv", "contribs_112.csv", "contribs_113.csv"]);
   assertEquals(filesForReport(files, "2025-07-15"), []);
+});
+
+Deno.test("B1: a new CRC keeps the file's first-row date and what was read, so a run does not probe it again", () => {
+  const entry = { name: "contribs_95.csv", crc: "54a61b9b", method: 8, compressedSize: 6146992, size: 60729412, offset: 1 };
+  const row = directoryRow(entry, { first_received: "2026-01-09", read_crc: "fe0ef817" });
+  assertEquals(row.crc, "54a61b9b");
+  assertEquals(row.first_received, "2026-01-09");
+  assertEquals(row.read_crc, "fe0ef817");
+  assertEquals(directoryRow(entry, undefined).first_received, null);
+});
+
+Deno.test("B1: a report already found needs no file read again for a new CRC, only a never-read file it may run on into", () => {
+  // tx_tec_files on 2026-11-25: every file below had a new CRC; 103 was never read.
+  const order = [
+    { name: "contribs_96.csv", read_crc: "old96" },
+    { name: "contribs_97.csv", read_crc: "old97" },
+    { name: "contribs_98.csv", read_crc: "old98" },
+    { name: "contribs_102.csv", read_crc: "old102" },
+    { name: "contribs_103.csv", read_crc: null },
+    { name: "contribs_113.csv", read_crc: "old113" },
+  ];
+  assertEquals(spillFiles(order, ["contribs_96.csv", "contribs_97.csv"]), []);
+  assertEquals(spillFiles(order, ["contribs_102.csv"]), ["contribs_103.csv"]);
+  assertEquals(spillFiles(order, ["contribs_113.csv"]), []);
 });
 
 Deno.test("B1: a 403 or 429 from the TEC's CDN is a refusal, and any other failure stays an error (issue #27)", async () => {

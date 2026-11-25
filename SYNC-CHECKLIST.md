@@ -136,9 +136,16 @@ shown.
       rebuilt its whole export and every file had to be looked at again (issue #27). Sync keeps the
       zip directory, makes at most 10 requests per run, 6 seconds apart, and treats a refusal as
       "continue next run", not as an error. A file with more than 50,000 matching rows is read over several calls in the same run
-      (each call has 2 seconds of CPU; `contribs_112.csv` ran out of it on 2026-11-12, issue #15). The remaining files (about 15) are read over the next
-      daily runs; the summaries are written when an official's files are all read. Check
-      `tx_contribution_summaries` for the three state officials after those runs.
+      (each call has 2 seconds of CPU; `contribs_112.csv` ran out of it on 2026-11-12, issue #15).
+    - Still open: the TEC changes most files' CRCs every night, so reading a file again for each new
+      CRC never caught up; on 2026-11-25 the run spent its 10 requests and saved no file. Sync now
+      reads a file again only for a report whose rows are not stored yet (issue #29). The
+      summaries are written once nothing is left to read. Check `tx_contribution_summaries` for the
+      three state officials after the first run with this change.
+    - Still open: Herbert's 30-day report received 2026-10-02 (report 101068380) has no rows in
+      any file read so far; first-row dates are not in file order around October 2026 (contribs_107
+      starts 2026-10-03, contribs_105 and 106 on 2026-10-05), so the files that hold it are not
+      found by date. Its cover-sheet total is in the summary; its itemized gifts are not.
 
 - [x] **B2. Choose the FEC cycle after the election**
   - Why: `cycleFor()` takes the year of `election_date` (2026), so Sync keeps reading the 2026

@@ -122,17 +122,25 @@ never falls back to a name search.
 - **Senate Journal.** The lieutenant governor is not a senator, so the journal lists them in a
   roll call only when they vote (a tie, or the Committee of the Whole). That is rare: none from
   1999 to 2025. Every day of the term is still read once.
-- **TEC.** Reports a later report replaced (`infoOnlyFlag = Y`) are left out. A contribs file is
-  read again only when its CRC changes, and only files that hold the official's reports are read.
-  Files run in the order reports arrived, so a report is looked for by the day it was received
-  (report IDs are not in file order). The TEC's CDN refuses byte ranges (403) after a burst of
+- **TEC.** Reports a later report replaced (`infoOnlyFlag = Y`) are left out. Only files that hold
+  the official's reports are read. Files run roughly in the order reports arrived, so a report is
+  looked for by the day it was received (report IDs are not in file order). The TEC changes the CRC
+  of most contribs files every night (between the 2026-11-23 and 2026-11-24 exports, 95 to 99, 107
+  and 113 all changed; their reports did not), so a new CRC is not a reason to read a file again.
+  A report whose rows are already stored is done, except that a never-read file right after the one
+  that holds it is read once, in case the report runs on into it. A report with no rows stored yet
+  is looked for in the files that may hold it, read again when their CRC is new; that is how a
+  newly filed report is found. A file keeps its first row's date when its CRC changes (contribs_107,
+  112 and 113 started on the same day on 2026-11-12 and on 2026-11-25), so files are not probed
+  again. Before 2026-11-25 every new CRC cleared that date and marked the file unread, and the
+  nightly run spent its requests probing and starting files it never finished (issue #29). The TEC's CDN refuses byte ranges (403) after a burst of
   requests: after 13 to 15 on 2026-11-22 and 2026-11-23. So Sync reads the zip's directory once
   per run (kept in `tx_tec_files`; a HEAD and a range, counted as two requests) and makes at most
   10 requests per run, 6 seconds apart. If the CDN still refuses (403 or 429), the rest of the run
   makes no TEC request, the run notes it and counts `tec_refused`, and reading continues next run
-  with everything read before the refusal kept; it is not an error. A backfill, or a catch-up after
-  the TEC rebuilds its whole export (it did around 2026-11-21, which changed every file's CRC),
-  therefore takes a few daily runs; after that a day needs only a handful of requests. Downloading
+  with everything read before the refusal kept; it is not an error. A backfill therefore takes a few
+  daily runs; after that a day needs only the zip's directory, `cover.csv` when it changed, and the
+  files of any new reports. Downloading
   the whole zip instead is not possible: it is about 1 GB and a stage call has 2 seconds of CPU.
 - **TEC, long files.** A stage call has 2 seconds of CPU, and parsing every matching row of a busy
   file takes more: `contribs_112.csv` (57 MB, the 8-day reports filed from 2026-10-26; Hinojosa's
