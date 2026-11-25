@@ -6,9 +6,10 @@
 //   2. contribs_NN.csv files hold itemized contributions, roughly in the order reports arrived.
 //      The first report ID of each file is noted (tx_tec_files) so only the files that hold an
 //      official's reports are read. Each read file leaves per-report totals, in-state totals,
-//      employers, and the largest gifts in tx_tec_report_parts. A file is read again only when
-//      its CRC changes. Each call has 2 seconds of CPU, so a call reads at most one file and parses
-//      at most TEC_ROWS_PER_CALL of its rows; a longer file goes on in the next call from where the
+//      employers, and the largest gifts in tx_tec_report_parts. The TEC changes most files' CRCs
+//      every night, so a file already read is read again only for a report not found yet. Each
+//      call has 2 seconds of CPU, so a call reads at most one file and parses at most
+//      TEC_ROWS_PER_CALL of its rows; a longer file goes on in the next call from where the
 //      last one stopped, with the totals so far in the run's carry, and is saved once it is done.
 //      Rows of other filers, non-receipt rows, and rows of replaced reports are dropped before
 //      they are parsed.
@@ -289,6 +290,28 @@ export function filesForReport(files: { name: string; first: string }[], receive
   return [...(before ? [before.name] : []), ...sorted.filter((f) => f.first === receivedOn).map((f) => f.name)];
 }
 
+export function directoryRow(entry: ZipEntry, old: Pick<FileRow, "first_received" | "read_crc"> | undefined) {
+  return {
+    name: entry.name,
+    crc: entry.crc,
+    offset: entry.offset,
+    compressed_size: entry.compressedSize,
+    size: entry.size,
+    method: entry.method,
+    first_received: old?.first_received ?? null,
+    read_crc: old?.read_crc ?? null,
+  };
+}
+
+export function spillFiles(order: { name: string; read_crc: string | null }[], found: string[]) {
+  const spill = new Set<string>();
+  order.forEach((row, i) => {
+    const after = order[i + 1];
+    if (found.includes(row.name) && after && after.read_crc === null && !found.includes(after.name)) spill.add(after.name);
+  });
+  return [...spill];
+}
+
 /**
  * Requests to the TEC per run. Its CDN refuses byte ranges (403) after a burst of requests, so a
  * run stays well under that and spaces requests out; a backfill continues over the next runs.
@@ -344,11 +367,7 @@ async function readTec(ctx: Ctx, p: Politician, filerId: string, carry: TecCarry
   let zipUrl = meta?.read_crc ?? "";
   if (!meta?.fetched_at || meta.fetched_at < ctx.runStartedAt) {
     const zip = await listZip();
-    await saveFiles(ctx, zip.entries.map((e) => {
-      const old = state.get(e.name);
-      const same = old?.crc === e.crc;
-      return { name: e.name, crc: e.crc, offset: e.offset, compressed_size: e.compressedSize, size: e.size, method: e.method, first_received: same ? old.first_received : null, read_crc: old?.read_crc ?? null };
-    }));
+    await saveFiles(ctx, zip.entries.map((e) => directoryRow(e, state.get(e.name))));
     await spent([{ name: "_zip", crc: zip.lastModified, read_crc: zip.url }], ZIP_DIRECTORY_REQUESTS);
     zipUrl = zip.url;
     state = await fileRows(ctx);
@@ -398,8 +417,20 @@ async function readTec(ctx: Ctx, p: Politician, filerId: string, carry: TecCarry
     await spent([{ name: row.name, crc: row.crc, first_received: first }]);
     return first as string;
   };
+  const { data: partFiles, error: partFilesError } = await ctx.db.from("tx_tec_report_parts").select("file_name, report_id").eq("filer_ident", filerId);
+  if (partFilesError) throw new Error(`tx_tec_report_parts: ${partFilesError.message}`);
+  const readFor = new Map<number, string[]>();
+  for (const row of (partFiles ?? []) as { file_name: string; report_id: number }[]) {
+    const id = Number(row.report_id);
+    readFor.set(id, [...(readFor.get(id) ?? []), row.file_name]);
+  }
   const needed = new Set<string>();
   for (const report of wanted) {
+    const found = readFor.get(report.report_id);
+    if (found) {
+      for (const name of spillFiles(order, found)) needed.add(name);
+      continue;
+    }
     // Binary search for the last file that starts on or before the day the report was received.
     let lo = 0;
     let hi = order.length - 1;
