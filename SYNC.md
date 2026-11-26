@@ -124,13 +124,20 @@ never falls back to a name search.
   1999 to 2025. Every day of the term is still read once.
 - **TEC.** Reports a later report replaced (`infoOnlyFlag = Y`) are left out. Only files that hold
   the official's reports are read. Files run roughly in the order reports arrived, so a report is
-  looked for by the day it was received (report IDs are not in file order). The TEC changes the CRC
+  looked for by the day it was received (report IDs are not in file order). Only roughly: around
+  October 2026 contribs_107 starts on 2026-10-03 and contribs_105 and 106 on 2026-10-05, so a report
+  received on 2026-10-02 was never looked for in 105 or 106 (issue #31). So the files looked in are
+  the last file that starts on or before that day, the files around it in file order whose first
+  rows are within 7 days of that day (`TEC_FILE_WINDOW_DAYS`), and the one before them. The TEC changes the CRC
   of most contribs files every night (between the 2026-11-23 and 2026-11-24 exports, 95 to 99, 107
   and 113 all changed; their reports did not), so a new CRC is not a reason to read a file again.
   A report whose rows are already stored is done, except that a never-read file right after the one
   that holds it is read once, in case the report runs on into it. A report with no rows stored yet
   is looked for in the files that may hold it, read again when their CRC is new; that is how a
-  newly filed report is found. A file keeps its first row's date when its CRC changes (contribs_107,
+  newly filed report is found. A never-read file is read before a changed one, after the file an
+  earlier call stopped in. When nothing is left to read and a wanted report still has no rows, the
+  run notes name the report and the files it was looked in, so the gap shows instead of passing
+  silently; its cover-sheet total is still in the summary. A file keeps its first row's date when its CRC changes (contribs_107,
   112 and 113 started on the same day on 2026-11-12 and on 2026-11-25), so files are not probed
   again. Before 2026-11-25 every new CRC cleared that date and marked the file unread, and the
   nightly run spent its requests probing and starting files it never finished (issue #29). The TEC's CDN refuses byte ranges (403) after a burst of
@@ -450,14 +457,14 @@ deno test --allow-read --node-modules-dir=none supabase/functions/tx_sync/tests/
 deno run --allow-net --allow-env=DATA_GOV_KEY --node-modules-dir=none scripts/sync-live-check.ts
 ```
 
-The tests run on real pages saved from each source (`tests/fixtures`): 54 tests, of which G1 to G10
+The tests run on real pages saved from each source (`tests/fixtures`): 63 tests, of which G1 to G10
 cover the event sources, the refresh rule, "Not loaded yet", and hearing bill links. S3 checks that
 no stage reads a campaign site, its sitemap, its pages or its events page, and that the Events page
 names no campaign source as "not loaded". G2 also covers
 every TLO feed as the live site served it between sessions (2026-11-09 and 2026-11-10), an item in an
 unknown format, and a Sync run on an empty House calendars feed. B1 also checks that a TEC file
 read in batches, with the carry passed as JSON between calls, adds up to the same parts as one read,
-that matching lines come in file order whatever the chunking, and that rows of other filers and of replaced reports are dropped before they are parsed. CI runs them on every pull request. Strip any keys a
+that matching lines come in file order whatever the chunking, that rows of other filers and of replaced reports are dropped before they are parsed, and that a report is looked for in files whose first rows are out of date order (issue #31). CI runs them on every pull request. Strip any keys a
 saved page embeds before committing it (GitHub push protection blocks them). The live check reads the real sources and prints statistics; it writes nothing. Its `events`
 section (`scripts/sync-live-check.ts events`) prints, for each event source, how many items it parsed
 against how many the page lists, and a sample. For TLO's feeds it also prints the "nothing posted" item

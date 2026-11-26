@@ -16,7 +16,7 @@ import { centralDate, type Ctx, type Http, type Log, mergeLog, texasLegislature 
 import { TOPIC_STEPS } from "../topics.ts";
 import { notAutomatedNotes, SOURCES, sourcesFor } from "../sources.ts";
 import { RATE_LIMIT_PAD_MS, rateLimitRetryMs, slotWaitMs, STAGE_CALL_WINDOW_MS, STAGE_CALLS_PER_WINDOW } from "../stage_pacing.ts";
-import { contribsFilter, coverRow, directoryRow, filesForReport, MAX_TEC_REQUESTS_PER_RUN, partBuilder, readContribs, reportCycle, requestsUsed, spillFiles, summarize, tecReportUrl, type TecReport, untilRefused } from "../tec.ts";
+import { contribsFilter, coverRow, directoryRow, filesForReport, MAX_TEC_REQUESTS_PER_RUN, missingReportNotes, nextFile, partBuilder, readContribs, reportCycle, requestsUsed, spillFiles, summarize, tecReportUrl, type TecReport, untilRefused } from "../tec.ts";
 import { csvFields, csvReader, grepLines, listZip, TecRefused } from "../tec_zip.ts";
 import { authorDate, houseVoteRows, parseAuthorReport, parseReportRows, tloSessions } from "../texas.ts";
 
@@ -301,9 +301,13 @@ Deno.test("B1: matching lines come in file order, whatever the needles and chunk
   }
 });
 
-Deno.test("B1: a report is looked for by the day it was received: the file that starts before it, and files that start that day", () => {
-  // Real first-row dates (contribs_95 starts 2026-01-09, contribs_111 starts 2026-10-05). Report IDs
-  // are NOT in file order (contribs_106 starts with a lower ID than contribs_104), dates are.
+const lookup = (files: { name: string; first: string }[], receivedOn: string, probed: number[] = []) =>
+  filesForReport(files.map((f) => f.name), receivedOn, (i) => {
+    probed.push(i);
+    return Promise.resolve(files[i].first);
+  });
+
+Deno.test("B1: a report is looked for in the files that start within a week of the day it was received, and the one before them", async () => {
   const files = [
     { name: "contribs_95.csv", first: "2026-01-09" },
     { name: "contribs_110.csv", first: "2026-10-01" },
@@ -311,9 +315,64 @@ Deno.test("B1: a report is looked for by the day it was received: the file that 
     { name: "contribs_112.csv", first: "2026-10-26" },
     { name: "contribs_113.csv", first: "2026-10-26" },
   ];
-  assertEquals(filesForReport(files, "2026-10-06"), ["contribs_111.csv"]);
-  assertEquals(filesForReport(files, "2026-10-26"), ["contribs_111.csv", "contribs_112.csv", "contribs_113.csv"]);
-  assertEquals(filesForReport(files, "2025-07-15"), []);
+  assertEquals(await lookup(files, "2026-10-06"), ["contribs_95.csv", "contribs_110.csv", "contribs_111.csv"]);
+  assertEquals(await lookup(files, "2026-10-26"), ["contribs_111.csv", "contribs_112.csv", "contribs_113.csv"]);
+  assertEquals(await lookup(files, "2025-07-15"), []);
+});
+
+Deno.test("B1: files whose first rows are out of date order are still looked in (issue #31)", async () => {
+  const files = [
+    { name: "contribs_101.csv", first: "2026-07-01" },
+    { name: "contribs_102.csv", first: "2026-07-15" },
+    { name: "contribs_103.csv", first: "2026-08-05" },
+    { name: "contribs_104.csv", first: "2026-10-01" },
+    { name: "contribs_105.csv", first: "2026-10-05" },
+    { name: "contribs_106.csv", first: "2026-10-05" },
+    { name: "contribs_107.csv", first: "2026-10-03" },
+    { name: "contribs_108.csv", first: "2026-10-05" },
+    { name: "contribs_109.csv", first: "2026-10-05" },
+    { name: "contribs_110.csv", first: "2026-10-05" },
+    { name: "contribs_111.csv", first: "2026-10-05" },
+    { name: "contribs_112.csv", first: "2026-10-26" },
+    { name: "contribs_113.csv", first: "2026-11-02" },
+  ];
+  const probed: number[] = [];
+  const picked = await lookup(files, "2026-10-02", probed);
+  assertEquals(picked, ["contribs_103.csv", "contribs_104.csv", "contribs_105.csv", "contribs_106.csv", "contribs_107.csv", "contribs_108.csv", "contribs_109.csv", "contribs_110.csv", "contribs_111.csv"]);
+  assertEquals(probed.includes(12), false);
+});
+
+Deno.test("B1: a report whose files cannot be probed this run waits for the next run", async () => {
+  const names = ["contribs_103.csv", "contribs_104.csv", "contribs_105.csv"];
+  assertEquals(await filesForReport(names, "2026-10-02", (i) => Promise.resolve(i === 1 ? null : "2026-10-01")), null);
+});
+
+Deno.test("B1: the next file read is the one a call stopped in, then a never-read file, then a changed one", () => {
+  const order = [
+    { name: "contribs_103.csv", crc: "c103", read_crc: "c103" },
+    { name: "contribs_104.csv", crc: "c104", read_crc: "old104" },
+    { name: "contribs_105.csv", crc: "c105", read_crc: null },
+    { name: "contribs_107.csv", crc: "c107", read_crc: "old107" },
+  ];
+  const needed = new Set(order.map((row) => row.name));
+  assertEquals(nextFile(order, needed, null)?.name, "contribs_105.csv");
+  assertEquals(nextFile(order, needed, { file: "contribs_107.csv", crc: "c107" })?.name, "contribs_107.csv");
+  assertEquals(nextFile(order, needed, { file: "contribs_107.csv", crc: "older" })?.name, "contribs_105.csv");
+  assertEquals(nextFile(order, new Set(["contribs_103.csv", "contribs_104.csv"]), null)?.name, "contribs_104.csv");
+  assertEquals(nextFile(order, new Set(["contribs_103.csv"]), null), undefined);
+});
+
+Deno.test("B1: a wanted report with no rows in any file read is named in the run notes (issue #31)", () => {
+  const wanted = [
+    { report_id: 101068380, received_on: "2026-10-02" },
+    { report_id: 101072551, received_on: "2026-10-26" },
+  ];
+  const found = new Map([[101072551, ["contribs_112.csv"]]]);
+  const notes = missingReportNotes("Zach Herbert", wanted, found, new Map([[101068380, ["contribs_103.csv", "contribs_104.csv"]]]));
+  assertEquals(notes.length, 1);
+  assertEquals(notes[0].includes("101068380"), true);
+  assertEquals(notes[0].includes("contribs_103.csv, contribs_104.csv"), true);
+  assertEquals(missingReportNotes("Zach Herbert", wanted.slice(1), found, new Map()), []);
 });
 
 Deno.test("B1: a new CRC keeps the file's first-row date and what was read, so a run does not probe it again", () => {
