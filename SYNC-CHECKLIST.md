@@ -144,8 +144,10 @@ shown.
       three state officials after the first run with this change.
     - Still open: Herbert's 30-day report received 2026-10-02 (report 101068380) has no rows in
       any file read so far; first-row dates are not in file order around October 2026 (contribs_107
-      starts 2026-10-03, contribs_105 and 106 on 2026-10-05), so the files that hold it are not
-      found by date. Its cover-sheet total is in the summary; its itemized gifts are not.
+      starts 2026-10-03, contribs_105 and 106 on 2026-10-05), so the binary search never picked 105
+      or 106. Sync now looks in every file whose first row is within 7 days of the day a report was
+      received, reads never-read files first, and names a wanted report with no rows in the run
+      notes (issue #31). Check that report's parts after the first runs with this change.
 
 - [x] **B2. Choose the FEC cycle after the election**
   - Why: `cycleFor()` takes the year of `election_date` (2026), so Sync keeps reading the 2026

@@ -279,15 +279,48 @@ const entryOf = (row: FileRow): ZipEntry => ({
   method: Number(row.method),
 });
 
-/**
- * The contribs files that can hold a report received on `receivedOn`. Files run in the order
- * reports arrived, so the report's rows are in the last file that starts before that day, plus any
- * files that start on that day.
- */
-export function filesForReport(files: { name: string; first: string }[], receivedOn: string) {
-  const sorted = [...files].sort((a, b) => Number(a.name.match(/\d+/)![0]) - Number(b.name.match(/\d+/)![0]));
-  const before = sorted.filter((f) => f.first < receivedOn).at(-1);
-  return [...(before ? [before.name] : []), ...sorted.filter((f) => f.first === receivedOn).map((f) => f.name)];
+export const TEC_FILE_WINDOW_DAYS = 7;
+
+const shiftDay = (day: string, days: number) => new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+export async function filesForReport(names: string[], receivedOn: string, firstOf: (index: number) => Promise<string | null>) {
+  let lo = 0;
+  let hi = names.length - 1;
+  let last = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const first = await firstOf(mid);
+    if (first === null) return null;
+    if (first <= receivedOn) (last = mid), (lo = mid + 1);
+    else hi = mid - 1;
+  }
+  const from = shiftDay(receivedOn, -TEC_FILE_WINDOW_DAYS);
+  const to = shiftDay(receivedOn, TEC_FILE_WINDOW_DAYS);
+  const picked: string[] = [];
+  for (let i = last; i >= 0; i--) {
+    const first = await firstOf(i);
+    if (first === null) return null;
+    picked.unshift(names[i]);
+    if (first < from) break;
+  }
+  for (let i = last + 1; i < names.length; i++) {
+    const first = await firstOf(i);
+    if (first === null) return null;
+    if (first > to) break;
+    picked.push(names[i]);
+  }
+  return picked;
+}
+
+export function nextFile<T extends { name: string; crc: string; read_crc: string | null }>(order: T[], needed: Set<string>, cursor: { file: string; crc: string } | null) {
+  const unread = order.filter((row) => needed.has(row.name) && row.read_crc !== row.crc);
+  return unread.find((row) => cursor?.file === row.name && cursor.crc === row.crc) ?? unread.find((row) => row.read_crc === null) ?? unread[0];
+}
+
+export function missingReportNotes(name: string, wanted: Pick<TecReport, "report_id" | "received_on">[], found: Map<number, string[]>, lookedIn: Map<number, string[]>) {
+  return wanted
+    .filter((report) => !found.has(report.report_id))
+    .map((report) => `Texas Ethics Commission: ${name}'s report ${report.report_id} (received ${report.received_on}) has no itemized rows in the files read so far (${(lookedIn.get(report.report_id) ?? []).join(", ") || "no file found for its date"}). Its cover-sheet total is counted; its gifts are not.`);
 }
 
 export function directoryRow(entry: ZipEntry, old: Pick<FileRow, "first_received" | "read_crc"> | undefined) {
@@ -425,34 +458,22 @@ async function readTec(ctx: Ctx, p: Politician, filerId: string, carry: TecCarry
     readFor.set(id, [...(readFor.get(id) ?? []), row.file_name]);
   }
   const needed = new Set<string>();
+  const lookedIn = new Map<number, string[]>();
+  const names = order.map((row) => row.name);
   for (const report of wanted) {
     const found = readFor.get(report.report_id);
     if (found) {
       for (const name of spillFiles(order, found)) needed.add(name);
       continue;
     }
-    // Binary search for the last file that starts on or before the day the report was received.
-    let lo = 0;
-    let hi = order.length - 1;
-    let last = -1;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      const first = await firstOf(order[mid]);
-      if (first === null) return waitNote(ctx, p);
-      if (first <= report.received_on) (last = mid), (lo = mid + 1);
-      else hi = mid - 1;
-    }
-    // That file, any earlier files that start on the same day, and the one before them.
-    for (let i = last; i >= 0; i--) {
-      const first = await firstOf(order[i]);
-      if (first === null) return waitNote(ctx, p);
-      needed.add(order[i].name);
-      if (first < report.received_on) break;
-    }
+    const files = await filesForReport(names, report.received_on, (i) => firstOf(order[i]));
+    if (files === null) return waitNote(ctx, p);
+    lookedIn.set(report.report_id, files);
+    for (const name of files) needed.add(name);
   }
 
   // 3. Read one file that is new or changed, or the next rows of the one an earlier call stopped in.
-  const next = order.find((row) => needed.has(row.name) && row.read_crc !== row.crc);
+  const next = nextFile(order, needed, carry.cursor);
   if (next) {
     if (!budgetLeft()) return waitNote(ctx, p);
     const resume = carry.cursor?.file === next.name && carry.cursor.crc === next.crc ? carry.cursor : null;
@@ -480,6 +501,7 @@ async function readTec(ctx: Ctx, p: Politician, filerId: string, carry: TecCarry
     .select("report_id, itemized_total, in_state_total, employers, top_gifts")
     .eq("filer_ident", filerId);
   if (partError) throw new Error(`tx_tec_report_parts: ${partError.message}`);
+  ctx.log.notes.push(...missingReportNotes(p.name, wanted, readFor, lookedIn));
   for (const cycle of cycles) {
     const result = summarize(p.id, cycle, reports, (partData ?? []) as PartRow[]);
     if (!result) continue;
